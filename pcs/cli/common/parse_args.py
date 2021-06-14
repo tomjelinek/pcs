@@ -27,8 +27,6 @@ PCS_LONG_OPTIONS = [
     "fullhelp",
     "force",
     "skip-offline",
-    # TODO remove, deprecated command 'pcs config import-cman'
-    "interactive",
     "autodelete",
     "simulate",
     "all",
@@ -464,8 +462,6 @@ class InputModifiers:
                 # used only in deprecated 'pcs resource|stonith show'
                 "--groups": "--groups" in options,
                 "--hide-inactive": "--hide-inactive" in options,
-                # TODO remove, deprecated command 'pcs config import-cman'
-                "--interactive": "--interactive" in options,
                 "--local": "--local" in options,
                 "--master": "--master" in options,
                 "--monitor": "--monitor" in options,

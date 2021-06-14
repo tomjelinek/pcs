@@ -1,5 +1,17 @@
 # Change Log
 
+## [0.11.0]
+
+### Changed
+- Pcs no longer depends on python3-distro package
+
+### Removed
+- Deprecated obsolete commands `pcs config import-cman` and `pcs config export
+  pcs-commands|pcs-commands-verbose` have been removed ([rhbz#1881064])
+
+[rhbz#1881064]: https://bugzilla.redhat.com/show_bug.cgi?id=1881064
+
+
 ## [Unreleased]
 
 ### Added
@@ -28,6 +40,7 @@
 [rhbz#1896458]: https://bugzilla.redhat.com/show_bug.cgi?id=1896458
 [rhbz#1927404]: https://bugzilla.redhat.com/show_bug.cgi?id=1927404
 [rhbz#1930886]: https://bugzilla.redhat.com/show_bug.cgi?id=1930886
+
 
 ## [0.10.8] - 2021-02-01
 

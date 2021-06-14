@@ -26,7 +26,6 @@ These are the runtime dependencies of pcs and pcsd:
 * python 3.6+
 * python3-cryptography
 * python3-dateutil 2.7.0+
-* python3-distro (for python 3.8+)
 * python3-lxml
 * python3-pycurl
 * python3-setuptools
@@ -41,7 +40,6 @@ These are the runtime dependencies of pcs and pcsd:
 * pacemaker 2.x
 
 It is also recommended to have these:
-* python3-clufter
 * liberation fonts (package liberation-sans-fonts or fonts-liberation or
   fonts-liberation2)
 * overpass fonts (package overpass-fonts)
