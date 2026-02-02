@@ -1,16 +1,11 @@
-from typing import (
-    Any,
-    Iterable,
-    Optional,
-    Type,
-)
+import base64
+import binascii
+from typing import Any, Iterable, Optional, Type
 
-from tornado.web import (
-    Finish,
-    HTTPError,
-    RequestHandler,
-)
+from tornado.web import Finish, HTTPError, RequestHandler
 from tornado.web import RedirectHandler as TornadoRedirectHandler
+
+from pcs.lib.auth.tools import DesiredUser
 
 RoutesType = Iterable[
     tuple[str, Type[RequestHandler], Optional[dict[str, Any]]]
@@ -180,3 +175,21 @@ class RedirectHandler(EnhanceHeadersMixin, TornadoRedirectHandler):
     """
     RedirectHandler with modified HTTP headers.
     """
+
+
+def get_legacy_desired_user_from_request(
+    handler: RequestHandler,
+) -> DesiredUser:
+    username = handler.get_cookie("CIB_user")
+    groups = []
+    if username:
+        # use groups only if user is specified as well
+        groups_raw = handler.get_cookie("CIB_user_groups")
+        if groups_raw:
+            try:
+                groups = base64.b64decode(groups_raw).decode("utf-8").split(" ")
+            except (UnicodeError, binascii.Error):
+                # TODO logging ?
+                # self._auth_logger.warning("Unable to decode users groups")
+                groups = []
+    return DesiredUser(username, groups)

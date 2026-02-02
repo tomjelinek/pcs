@@ -1,39 +1,24 @@
 import json
-from typing import (
-    Any,
-    Dict,
-    Mapping,
-    Optional,
-)
+from typing import Any, Mapping, Optional
 
 from tornado.web import HTTPError
 
-from pcs.common import (
-    communication,
-    reports,
-)
+from pcs.common import communication, reports
 from pcs.common.async_tasks import types
-from pcs.common.async_tasks.dto import (
-    CommandDto,
-    CommandOptionsDto,
-)
+from pcs.common.async_tasks.dto import CommandDto, CommandOptionsDto
 from pcs.common.interface.dto import to_dict
-from pcs.daemon.app.auth import (
-    LegacyTokenAuthProvider,
-    NotAuthorizedException,
+from pcs.daemon.app.auth import NotAuthorizedException
+from pcs.daemon.app.auth_provider import (
+    ApiAuthProviderFactoryInterface,
+    ApiAuthProviderInterface,
 )
-from pcs.daemon.async_tasks.scheduler import (
-    Scheduler,
-    TaskNotFoundError,
-)
+from pcs.daemon.app.common import get_legacy_desired_user_from_request
+from pcs.daemon.async_tasks.scheduler import Scheduler, TaskNotFoundError
 from pcs.daemon.async_tasks.types import Command
-from pcs.lib.auth.provider import AuthProvider
+from pcs.lib.auth.tools import DesiredUser
 from pcs.lib.auth.types import AuthUser
 
-from .common import (
-    BaseHandler,
-    RoutesType,
-)
+from .common import BaseHandler, RoutesType
 
 API_V1_MAP: Mapping[str, str] = {
     "acl-create-role/v1": "acl.create_role",
@@ -141,33 +126,46 @@ class _BaseApiV1Handler(BaseHandler):
     """
 
     scheduler: Scheduler
-    json: Optional[Dict[str, Any]] = None
-    _auth_provider: LegacyTokenAuthProvider
+    json: Optional[dict[str, Any]] = None
+    _auth_provider: ApiAuthProviderInterface
 
     def initialize(
-        self, scheduler: Scheduler, auth_provider: AuthProvider
+        self,
+        api_auth_provider_factory: ApiAuthProviderFactoryInterface,
+        scheduler: Scheduler,
     ) -> None:
         super().initialize()
-        self._auth_provider = LegacyTokenAuthProvider(self, auth_provider)
+        self._auth_provider = api_auth_provider_factory.create(self)
         self.scheduler = scheduler
 
     def prepare(self) -> None:
-        """JSON preprocessing"""
         self.add_header("Content-Type", "application/json")
+
+        if not self._auth_provider.can_handle_request():
+            raise ApiError(
+                response_code=communication.const.COM_STATUS_NOT_AUTHORIZED,
+                response_msg="",
+                http_code=401,
+            )
+
+        # JSON preprocessing
         try:
             self.json = json.loads(self.request.body)
         except json.JSONDecodeError as e:
             raise InvalidInputError() from e
 
-    async def get_auth_user(self) -> tuple[AuthUser, AuthUser]:
+    async def get_auth_user(self) -> AuthUser:
         try:
-            return await self._auth_provider.auth_by_token_effective_user()
+            return await self._auth_provider.auth_user()
         except NotAuthorizedException as e:
             raise ApiError(
                 response_code=communication.const.COM_STATUS_NOT_AUTHORIZED,
                 response_msg="",
                 http_code=401,
             ) from e
+
+    def get_desired_user(self) -> DesiredUser:
+        return get_legacy_desired_user_from_request(self)
 
     def send_response(
         self, response: communication.dto.InternalCommunicationResultDto
@@ -204,7 +202,8 @@ class _BaseApiV1Handler(BaseHandler):
     async def process_request(
         self, cmd: str
     ) -> communication.dto.InternalCommunicationResultDto:
-        real_user, effective_user = await self.get_auth_user()
+        real_user = await self.get_auth_user()
+        desired_user = self.get_desired_user()
         if cmd not in API_V1_MAP:
             raise ApiError(
                 communication.const.COM_STATUS_UNKNOWN_CMD,
@@ -215,9 +214,13 @@ class _BaseApiV1Handler(BaseHandler):
         command_dto = CommandDto(
             command_name=API_V1_MAP[cmd],
             params=self.json,
+            # the scheduler/executor handles whether the command is run with
+            # real_user permissions or the effective user is used
             options=CommandOptionsDto(
-                effective_username=effective_user.username,
-                effective_groups=list(effective_user.groups),
+                effective_username=desired_user.username,
+                effective_groups=list(desired_user.groups)
+                if desired_user.groups
+                else None,
             ),
         )
         task_ident = self.scheduler.new_task(
@@ -275,6 +278,12 @@ class LegacyApiV1Handler(_BaseApiV1Handler):
 
     def prepare(self) -> None:
         self.add_header("Content-Type", "application/json")
+        if not self._auth_provider.can_handle_request():
+            raise ApiError(
+                response_code=communication.const.COM_STATUS_NOT_AUTHORIZED,
+                response_msg="",
+                http_code=401,
+            )
         try:
             self.json = json.loads(self.get_argument("data_json", default=""))
         except json.JSONDecodeError as e:
@@ -316,18 +325,19 @@ class ClusterAddNodesLegacyHandler(LegacyApiV1Handler):
         return "cluster-add-nodes/v1"
 
 
-def get_routes(scheduler: Scheduler, auth_provider: AuthProvider) -> RoutesType:
-    params = dict(scheduler=scheduler, auth_provider=auth_provider)
+def get_routes(
+    api_auth_provider_factory: ApiAuthProviderFactoryInterface,
+    scheduler: Scheduler,
+) -> RoutesType:
+    params = dict(
+        api_auth_provider_factory=api_auth_provider_factory, scheduler=scheduler
+    )
     return [
         (
             "/remote/cluster_status_plaintext",
             ClusterStatusLegacyHandler,
             params,
         ),
-        (
-            "/remote/cluster_add_nodes",
-            ClusterAddNodesLegacyHandler,
-            params,
-        ),
+        ("/remote/cluster_add_nodes", ClusterAddNodesLegacyHandler, params),
         (r"/api/v1/(.*)", ApiV1Handler, params),
     ]
