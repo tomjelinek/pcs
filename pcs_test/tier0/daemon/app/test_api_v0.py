@@ -1,6 +1,7 @@
+import base64
 import json
 import logging
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from unittest import mock
 from urllib.parse import urlencode
 
@@ -20,7 +21,12 @@ from pcs.common.async_tasks.types import (
 )
 from pcs.common.file import RawFileError
 from pcs.common.pcs_cfgsync_dto import SyncConfigsDto
-from pcs.daemon.app import api_v0
+from pcs.daemon.app import api_v0, api_v2
+from pcs.daemon.app.auth import NotAuthorizedException
+from pcs.daemon.app.auth_provider import (
+    ApiAuthProviderFactoryInterface,
+    ApiAuthProviderInterface,
+)
 from pcs.daemon.async_tasks.scheduler import (
     Scheduler,
     TaskNotFoundError,
@@ -34,13 +40,29 @@ from pcs_test.tier0.daemon.app.fixtures_app_api import ApiTestBase
 logging.getLogger("tornado.access").setLevel(logging.CRITICAL)
 
 
-class MockAuthProvider:
-    auth_successful: bool = True
+class MockAuthProviderFactory(ApiAuthProviderFactoryInterface):
+    auth_result: Literal["ok", "cannot_handle_request", "not_authorized"] = "ok"
     user = AuthUser("hacluster", ["haclient"])
 
-    def auth_by_token(self, token: str) -> Optional[AuthUser]:
-        del token
-        return self.user if self.auth_successful else None
+    def __init__(self):
+        self.provider: Optional[mock.AsyncMock] = None
+
+    def create(
+        self, handler: api_v2._BaseApiV2Handler
+    ) -> ApiAuthProviderInterface:
+        del handler
+
+        self.provider = mock.AsyncMock(spec=ApiAuthProviderInterface)
+        match self.auth_result:
+            case "ok":
+                self.provider.can_handle_request.return_value = True
+                self.provider.auth_user.return_value = self.user
+            case "cannot_handle_request":
+                self.provider.can_handle_request.return_value = False
+            case "not_authorized":
+                self.provider.can_handle_request.return_value = True
+                self.provider.auth_user.side_effect = NotAuthorizedException()
+        return self.provider
 
 
 class ApiV0Test(ApiTestBase):
@@ -50,7 +72,7 @@ class ApiV0Test(ApiTestBase):
 
     def setUp(self) -> None:
         self.scheduler = mock.AsyncMock(Scheduler)
-        self.auth_provider = MockAuthProvider()
+        self.api_auth_provider_factory = MockAuthProviderFactory()
         super().setUp()
 
     def get_app(self) -> Application:
@@ -83,6 +105,27 @@ class ApiV0Test(ApiTestBase):
         self.assert_headers(response.headers)
         return response
 
+    def assert_error_with_report(self, url, **kwargs):
+        """
+        Test that the handler returns http 400 and report items in body.
+        This method requires self.mock_process_request to be set up.
+        """
+        # The actual report items don't matter, we can pick any simple report item.
+        self.mock_run_library_command.return_value = self.result_failure(
+            "some error",
+            [
+                reports.ReportItem.error(
+                    reports.messages.StonithUnfencingFailed("an error"),
+                    context=reports.ReportItemContext("node1"),
+                ).to_dto()
+            ],
+        )
+        response = self.fetch(url, **kwargs)
+        self.assert_body(
+            response.body, "Error: node1: Unfencing failed:\nan error"
+        )
+        self.assertEqual(response.code, 400)
+
 
 class BaseApiV0Handler(ApiV0Test):
     """
@@ -98,15 +141,19 @@ class BaseApiV0Handler(ApiV0Test):
     class HandlerForTest(api_v0._BaseApiV0Handler):
         # pylint: disable=protected-access
 
-        def initialize(self, scheduler, auth_provider, cmd_name, cmd_params):
+        def initialize(
+            self, api_auth_provider_factory, scheduler, cmd_name, cmd_params
+        ):
             # pylint: disable=arguments-differ
             # pylint: disable=attribute-defined-outside-init
-            super().initialize(scheduler, auth_provider)
+            super().initialize(api_auth_provider_factory, scheduler)
             self.cmd_name = cmd_name
             self.cmd_params = cmd_params
 
         async def _handle_request(self):
-            result = await self._process_request(self.cmd_name, self.cmd_params)
+            result = await self._run_library_command(
+                self.cmd_name, self.cmd_params
+            )
             messages = [
                 report_item.message.message for report_item in result.reports
             ]
@@ -126,7 +173,7 @@ class BaseApiV0Handler(ApiV0Test):
                         cmd_name=self.cmd_name,
                         cmd_params=self.cmd_params,
                         scheduler=self.scheduler,
-                        auth_provider=self.auth_provider,
+                        api_auth_provider_factory=self.api_auth_provider_factory,
                     ),
                 )
             ]
@@ -138,8 +185,7 @@ class BaseApiV0Handler(ApiV0Test):
             command_name=self.cmd_name,
             params=self.cmd_params,
             options=CommandOptionsDto(
-                effective_username=self.auth_provider.user.username,
-                effective_groups=self.auth_provider.user.groups,
+                effective_username=None, effective_groups=None
             ),
         )
         self.scheduler.new_task.return_value = self.task_ident
@@ -149,10 +195,10 @@ class BaseApiV0Handler(ApiV0Test):
         if self.command_executed:
             self.scheduler.new_task.assert_called_once_with(
                 Command(self.command_dto, is_legacy_command=True),
-                self.auth_provider.user,
+                self.api_auth_provider_factory.user,
             )
             self.scheduler.wait_for_task.assert_called_once_with(
-                self.task_ident, self.auth_provider.user
+                self.task_ident, self.api_auth_provider_factory.user
             )
 
     def test_success(self):
@@ -180,6 +226,8 @@ class BaseApiV0Handler(ApiV0Test):
             ),
         )
         self.assertEqual(response.code, 200)
+        self.api_auth_provider_factory.provider.can_handle_request.assert_called_once_with()
+        self.api_auth_provider_factory.provider.auth_user.assert_called_once_with()
 
     def test_task_not_found(self):
         self.scheduler.wait_for_task.side_effect = TaskNotFoundError(
@@ -190,13 +238,25 @@ class BaseApiV0Handler(ApiV0Test):
         self.assert_body(response.body, "Internal server error")
         self.assertEqual(response.code, 500)
 
-    def test_not_authorized(self):
-        self.auth_provider.auth_successful = False
+    def test_auth_cannot_handle_request(self):
+        self.api_auth_provider_factory.auth_result = "cannot_handle_request"
         self.command_executed = False
 
         response = self.fetch(self.url)
         self.assert_body(response.body, '{"notauthorized":"true"}')
         self.assertEqual(response.code, 401)
+        self.api_auth_provider_factory.provider.can_handle_request.assert_called_once_with()
+        self.api_auth_provider_factory.provider.auth_user.assert_not_called()
+
+    def test_not_authorized(self):
+        self.api_auth_provider_factory.auth_result = "not_authorized"
+        self.command_executed = False
+
+        response = self.fetch(self.url)
+        self.assert_body(response.body, '{"notauthorized":"true"}')
+        self.assertEqual(response.code, 401)
+        self.api_auth_provider_factory.provider.can_handle_request.assert_called_once_with()
+        self.api_auth_provider_factory.provider.auth_user.assert_called_once_with()
 
     def test_permission_denied(self):
         self.scheduler.wait_for_task.return_value = TaskResultDto(
@@ -262,6 +322,48 @@ class BaseApiV0Handler(ApiV0Test):
         self.assert_body(response.body, "Unhandled exception")
         self.assertEqual(response.code, 500)
 
+    def test_success_with_effective_user(self):
+        self.command_dto = CommandDto(
+            command_name=self.cmd_name,
+            params=self.cmd_params,
+            options=CommandOptionsDto(
+                effective_username="foo",
+                effective_groups=["haclient", "wheel", "square"],
+            ),
+        )
+        self.scheduler.wait_for_task.return_value = TaskResultDto(
+            task_ident=self.task_ident,
+            command=self.command_dto,
+            reports=[
+                reports.ReportItem.error(
+                    reports.messages.StonithUnfencingFailed("an error"),
+                ).to_dto()
+            ],
+            state=TaskState.FINISHED,
+            task_finish_type=TaskFinishType.SUCCESS,
+            kill_reason=None,
+            result="some result of the command",
+        )
+
+        groups_encoded = base64.b64encode(
+            "haclient wheel square".encode("utf-8")
+        ).decode("utf-8")
+        response = self.fetch(
+            self.url,
+            headers={
+                "Cookie": f"CIB_user=foo;CIB_user_groups={groups_encoded}"
+            },
+        )
+        self.assert_body(
+            response.body,
+            (
+                "success: True\n"
+                "result: some result of the command\n"
+                "reports: ['Unfencing failed:\\nan error']\n"
+            ),
+        )
+        self.assertEqual(response.code, 200)
+
 
 class ApiV0HandlerTest(ApiV0Test):
     """
@@ -270,19 +372,19 @@ class ApiV0HandlerTest(ApiV0Test):
 
     def setUp(self):
         super().setUp()
-        self.mock_process_request = mock.AsyncMock()
-        process_request_patcher = mock.patch.object(
+        self.mock_run_library_command = mock.AsyncMock()
+        run_library_command_patcher = mock.patch.object(
             # pylint: disable=protected-access
             api_v0._BaseApiV0Handler,
-            "_process_request",
-            self.mock_process_request,
+            "_run_library_command",
+            self.mock_run_library_command,
         )
-        process_request_patcher.start()
-        self.addCleanup(process_request_patcher.stop)
+        run_library_command_patcher.start()
+        self.addCleanup(run_library_command_patcher.stop)
 
     def get_app(self) -> Application:
         return Application(
-            api_v0.get_routes(self.scheduler, self.auth_provider)
+            api_v0.get_routes(self.api_auth_provider_factory, self.scheduler)
         )
 
 
@@ -291,11 +393,11 @@ class ResourceManageUnmanageMixin:
     command_data = {"resource_or_tag_ids": ["resource1", "resource2"]}
 
     def test_success(self):
-        self.mock_process_request.return_value = self.result_success()
+        self.mock_run_library_command.return_value = self.result_success()
         response = self.fetch(self.url, body=urlencode(self.body_data))
         self.assert_body(response.body, "")
         self.assertEqual(response.code, 200)
-        self.mock_process_request.assert_called_once_with(
+        self.mock_run_library_command.assert_called_once_with(
             self.command_name, self.command_data
         )
 
@@ -305,7 +407,7 @@ class ResourceManageUnmanageMixin:
             response.body, "Required parameters missing: 'resource_list_json'"
         )
         self.assertEqual(response.code, 400)
-        self.mock_process_request.assert_not_called()
+        self.mock_run_library_command.assert_not_called()
 
     def test_json_parse_error(self):
         response = self.fetch(
@@ -313,11 +415,11 @@ class ResourceManageUnmanageMixin:
         )
         self.assert_body(response.body, "Invalid input data format")
         self.assertEqual(response.code, 400)
-        self.mock_process_request.assert_not_called()
+        self.mock_run_library_command.assert_not_called()
 
     def test_failure(self):
         self.assert_error_with_report(self.url, body=urlencode(self.body_data))
-        self.mock_process_request.assert_called_once_with(
+        self.mock_run_library_command.assert_called_once_with(
             self.command_name, self.command_data
         )
 
@@ -336,19 +438,19 @@ class QdeviceNetGetCaCertificateHandler(ApiV0HandlerTest):
     url = "/remote/qdevice_net_get_ca_certificate"
 
     def test_success(self):
-        self.mock_process_request.return_value = self.result_success(
+        self.mock_run_library_command.return_value = self.result_success(
             "certificate data"
         )
         response = self.fetch(self.url)
         self.assert_body(response.body, "certificate data")
         self.assertEqual(response.code, 200)
-        self.mock_process_request.assert_called_once_with(
+        self.mock_run_library_command.assert_called_once_with(
             "qdevice.qdevice_net_get_ca_certificate", {}
         )
 
     def test_failure(self):
         self.assert_error_with_report(self.url)
-        self.mock_process_request.assert_called_once_with(
+        self.mock_run_library_command.assert_called_once_with(
             "qdevice.qdevice_net_get_ca_certificate", {}
         )
 
@@ -361,13 +463,13 @@ class QdeviceNetSignNodeCertificateHandler(ApiV0HandlerTest):
     }
 
     def test_success(self):
-        self.mock_process_request.return_value = self.result_success(
+        self.mock_run_library_command.return_value = self.result_success(
             "signed certificate data"
         )
         response = self.fetch(self.url, body=urlencode(self.body_data))
         self.assert_body(response.body, "signed certificate data")
         self.assertEqual(response.code, 200)
-        self.mock_process_request.assert_called_once_with(
+        self.mock_run_library_command.assert_called_once_with(
             "qdevice.qdevice_net_sign_certificate_request", self.body_data
         )
 
@@ -378,11 +480,11 @@ class QdeviceNetSignNodeCertificateHandler(ApiV0HandlerTest):
             "Required parameters missing: 'certificate_request', 'cluster_name'",
         )
         self.assertEqual(response.code, 400)
-        self.mock_process_request.assert_not_called()
+        self.mock_run_library_command.assert_not_called()
 
     def test_failure(self):
         self.assert_error_with_report(self.url, body=urlencode(self.body_data))
-        self.mock_process_request.assert_called_once_with(
+        self.mock_run_library_command.assert_called_once_with(
             "qdevice.qdevice_net_sign_certificate_request", self.body_data
         )
 
@@ -392,11 +494,11 @@ class QdeviceNetClientInitCertificateStorageHandler(ApiV0HandlerTest):
     body_data = {"ca_certificate": "base64 certificate data"}
 
     def test_success(self):
-        self.mock_process_request.return_value = self.result_success()
+        self.mock_run_library_command.return_value = self.result_success()
         response = self.fetch(self.url, body=urlencode(self.body_data))
         self.assert_body(response.body, "")
         self.assertEqual(response.code, 200)
-        self.mock_process_request.assert_called_once_with(
+        self.mock_run_library_command.assert_called_once_with(
             "qdevice.client_net_setup", self.body_data
         )
 
@@ -406,11 +508,11 @@ class QdeviceNetClientInitCertificateStorageHandler(ApiV0HandlerTest):
             response.body, "Required parameters missing: 'ca_certificate'"
         )
         self.assertEqual(response.code, 400)
-        self.mock_process_request.assert_not_called()
+        self.mock_run_library_command.assert_not_called()
 
     def test_failure(self):
         self.assert_error_with_report(self.url, body=urlencode(self.body_data))
-        self.mock_process_request.assert_called_once_with(
+        self.mock_run_library_command.assert_called_once_with(
             "qdevice.client_net_setup", self.body_data
         )
 
@@ -420,11 +522,11 @@ class QdeviceNetClientImportCertificateHandler(ApiV0HandlerTest):
     body_data = {"certificate": "base64 certificate data"}
 
     def test_success(self):
-        self.mock_process_request.return_value = self.result_success()
+        self.mock_run_library_command.return_value = self.result_success()
         response = self.fetch(self.url, body=urlencode(self.body_data))
         self.assert_body(response.body, "")
         self.assertEqual(response.code, 200)
-        self.mock_process_request.assert_called_once_with(
+        self.mock_run_library_command.assert_called_once_with(
             "qdevice.client_net_import_certificate", self.body_data
         )
 
@@ -434,11 +536,11 @@ class QdeviceNetClientImportCertificateHandler(ApiV0HandlerTest):
             response.body, "Required parameters missing: 'certificate'"
         )
         self.assertEqual(response.code, 400)
-        self.mock_process_request.assert_not_called()
+        self.mock_run_library_command.assert_not_called()
 
     def test_failure(self):
         self.assert_error_with_report(self.url, body=urlencode(self.body_data))
-        self.mock_process_request.assert_called_once_with(
+        self.mock_run_library_command.assert_called_once_with(
             "qdevice.client_net_import_certificate", self.body_data
         )
 
@@ -447,17 +549,17 @@ class QdeviceNetClientDestroyHandler(ApiV0HandlerTest):
     url = "/remote/qdevice_net_client_destroy"
 
     def test_success(self):
-        self.mock_process_request.return_value = self.result_success()
+        self.mock_run_library_command.return_value = self.result_success()
         response = self.fetch(self.url)
         self.assert_body(response.body, "")
         self.assertEqual(response.code, 200)
-        self.mock_process_request.assert_called_once_with(
+        self.mock_run_library_command.assert_called_once_with(
             "qdevice.client_net_destroy", {}
         )
 
     def test_failure(self):
         self.assert_error_with_report(self.url)
-        self.mock_process_request.assert_called_once_with(
+        self.mock_run_library_command.assert_called_once_with(
             "qdevice.client_net_destroy", {}
         )
 
@@ -481,8 +583,8 @@ class GetConfigsHandler(ApiV0HandlerTest):
                     "pcs_settings.conf: {pcs_settings_content}"
                 )
             ):
-                self.mock_process_request.reset_mock()
-                self.mock_process_request.return_value = self.result_success(
+                self.mock_run_library_command.reset_mock()
+                self.mock_run_library_command.return_value = self.result_success(
                     SyncConfigsDto(
                         "test",
                         {
@@ -514,12 +616,12 @@ class GetConfigsHandler(ApiV0HandlerTest):
                         }
                     ),
                 )
-                self.mock_process_request.assert_called_once_with(
+                self.mock_run_library_command.assert_called_once_with(
                     self.command, self.request_data
                 )
 
     def test_wrong_cluster_name(self):
-        self.mock_process_request.return_value = self.result_failure(
+        self.mock_run_library_command.return_value = self.result_failure(
             report_items=[
                 reports.ReportItem.error(
                     reports.messages.NodeReportsUnexpectedClusterName("test")
@@ -531,12 +633,12 @@ class GetConfigsHandler(ApiV0HandlerTest):
         self.assert_body(
             response.body, json.dumps({"status": "wrong_cluster_name"})
         )
-        self.mock_process_request.assert_called_once_with(
+        self.mock_run_library_command.assert_called_once_with(
             self.command, self.request_data
         )
 
     def test_cluster_name_parameter_not_provided(self):
-        self.mock_process_request.return_value = self.result_failure(
+        self.mock_run_library_command.return_value = self.result_failure(
             report_items=[
                 reports.ReportItem.error(
                     reports.messages.NodeReportsUnexpectedClusterName("test")
@@ -548,12 +650,12 @@ class GetConfigsHandler(ApiV0HandlerTest):
         self.assert_body(
             response.body, json.dumps({"status": "wrong_cluster_name"})
         )
-        self.mock_process_request.assert_called_once_with(
+        self.mock_run_library_command.assert_called_once_with(
             self.command, {"cluster_name": ""}
         )
 
     def test_unable_to_read_corosync_conf(self):
-        self.mock_process_request.return_value = self.result_failure(
+        self.mock_run_library_command.return_value = self.result_failure(
             report_items=[
                 reports.ReportItem.error(
                     reports.messages.FileIoError(
@@ -570,7 +672,7 @@ class GetConfigsHandler(ApiV0HandlerTest):
         self.assert_body(
             response.body, json.dumps({"status": "not_in_cluster"})
         )
-        self.mock_process_request.assert_called_once_with(
+        self.mock_run_library_command.assert_called_once_with(
             self.command, self.request_data
         )
 
@@ -578,6 +680,6 @@ class GetConfigsHandler(ApiV0HandlerTest):
         self.assert_error_with_report(
             self.url, body=urlencode(self.request_data)
         )
-        self.mock_process_request.assert_called_once_with(
+        self.mock_run_library_command.assert_called_once_with(
             self.command, self.request_data
         )

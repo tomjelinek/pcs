@@ -1,5 +1,5 @@
 import json
-from typing import Any, Mapping, cast
+from typing import Any, Mapping, Optional, cast
 
 from tornado.web import Finish
 
@@ -12,27 +12,43 @@ from pcs.daemon.app.api_v0_tools import (
     reports_to_str,
     run_library_command_in_scheduler,
 )
-from pcs.daemon.app.auth import LegacyTokenAuthenticationHandler
+from pcs.daemon.app.auth import NotAuthorizedException
+from pcs.daemon.app.auth_provider import (
+    ApiAuthProviderFactoryInterface,
+    ApiAuthProviderInterface,
+)
+from pcs.daemon.app.common import (
+    LegacyApiHandler,
+    get_legacy_desired_user_from_request,
+)
 from pcs.daemon.async_tasks.scheduler import Scheduler
-from pcs.lib.auth.provider import AuthProvider
+from pcs.lib.auth.tools import DesiredUser
+from pcs.lib.auth.types import AuthUser
 from pcs.lib.pcs_cfgsync.const import SYNCED_CONFIGS
 
 from .common import RoutesType
 
 
-class _BaseApiV0Handler(LegacyTokenAuthenticationHandler):
+class _BaseApiV0Handler(LegacyApiHandler):
     """
     Base class of handlers for the original API implemented in remote.rb
     """
 
+    _auth_provider: ApiAuthProviderInterface
     _scheduler: Scheduler
+    _real_user: Optional[AuthUser]
 
     def initialize(
-        self, scheduler: Scheduler, auth_provider: AuthProvider
+        self,
+        api_auth_provider_factory: ApiAuthProviderFactoryInterface,
+        scheduler: Scheduler,
     ) -> None:
-        # pylint: disable=arguments-differ
-        super().initialize(auth_provider)
+        self._auth_provider = api_auth_provider_factory.create(self)
         self._scheduler = scheduler
+
+    async def prepare(self) -> None:
+        if not self._auth_provider.can_handle_request():
+            raise self.unauthorized()
 
     async def _handle_request(self) -> None:
         """
@@ -55,22 +71,37 @@ class _BaseApiV0Handler(LegacyTokenAuthenticationHandler):
                 f"Required parameters missing: {format_list(missing_params)}"
             )
 
-    async def _process_request(
+    def _get_desired_user(self) -> DesiredUser:
+        return get_legacy_desired_user_from_request(self)
+
+    async def _get_auth_user(self) -> AuthUser:
+        try:
+            return await self._auth_provider.auth_user()
+        except NotAuthorizedException as e:
+            raise self.unauthorized() from e
+
+    async def _run_library_command(
         self, cmd_name: str, cmd_params: Mapping[str, Any]
     ) -> SimplifiedResult:
         """
         Helper method for calling pcs library commands
         """
+        real_user = await self._get_auth_user()
+        desired_user = self._get_desired_user()
         command_dto = CommandDto(
             command_name=cmd_name,
-            params=cmd_params,
+            params=dict(cmd_params),
+            # the scheduler/executor handles whether the command is run with
+            # real_user permissions or the effective user is used
             options=CommandOptionsDto(
-                effective_username=self.effective_user.username,
-                effective_groups=list(self.effective_user.groups),
+                effective_username=desired_user.username,
+                effective_groups=list(desired_user.groups)
+                if desired_user.groups
+                else None,
             ),
         )
         return await run_library_command_in_scheduler(
-            self._scheduler, command_dto, self.real_user, self._error
+            self._scheduler, command_dto, real_user, self._error
         )
 
 
@@ -81,7 +112,7 @@ class ResourceManageUnmanageHandler(_BaseApiV0Handler):
             resource_list = json.loads(self.get_argument("resource_list_json"))
         except json.JSONDecodeError as e:
             raise self._error("Invalid input data format") from e
-        result = await self._process_request(
+        result = await self._run_library_command(
             self._get_cmd(), dict(resource_or_tag_ids=resource_list)
         )
         if not result.success:
@@ -106,7 +137,7 @@ class ResourceUnmanageHandler(ResourceManageUnmanageHandler):
 
 class QdeviceNetGetCaCertificateHandler(_BaseApiV0Handler):
     async def _handle_request(self) -> None:
-        result = await self._process_request(
+        result = await self._run_library_command(
             "qdevice.qdevice_net_get_ca_certificate", {}
         )
         if not result.success:
@@ -117,7 +148,7 @@ class QdeviceNetGetCaCertificateHandler(_BaseApiV0Handler):
 class QdeviceNetSignNodeCertificateHandler(_BaseApiV0Handler):
     async def _handle_request(self) -> None:
         self._check_required_params({"certificate_request", "cluster_name"})
-        result = await self._process_request(
+        result = await self._run_library_command(
             "qdevice.qdevice_net_sign_certificate_request",
             dict(
                 certificate_request=self.get_argument("certificate_request"),
@@ -132,7 +163,7 @@ class QdeviceNetSignNodeCertificateHandler(_BaseApiV0Handler):
 class QdeviceNetClientInitCertificateStorageHandler(_BaseApiV0Handler):
     async def _handle_request(self) -> None:
         self._check_required_params({"ca_certificate"})
-        result = await self._process_request(
+        result = await self._run_library_command(
             "qdevice.client_net_setup",
             dict(ca_certificate=self.get_argument("ca_certificate")),
         )
@@ -143,7 +174,7 @@ class QdeviceNetClientInitCertificateStorageHandler(_BaseApiV0Handler):
 class QdeviceNetClientImportCertificateHandler(_BaseApiV0Handler):
     async def _handle_request(self) -> None:
         self._check_required_params({"certificate"})
-        result = await self._process_request(
+        result = await self._run_library_command(
             "qdevice.client_net_import_certificate",
             dict(certificate=self.get_argument("certificate")),
         )
@@ -153,7 +184,9 @@ class QdeviceNetClientImportCertificateHandler(_BaseApiV0Handler):
 
 class QdeviceNetClientDestroyHandler(_BaseApiV0Handler):
     async def _handle_request(self) -> None:
-        result = await self._process_request("qdevice.client_net_destroy", {})
+        result = await self._run_library_command(
+            "qdevice.client_net_destroy", {}
+        )
         if not result.success:
             raise self._error(reports_to_str(result.reports))
 
@@ -165,7 +198,7 @@ class GetConfigsHandler(_BaseApiV0Handler):
     }
 
     async def _handle_request(self) -> None:
-        result = await self._process_request(
+        result = await self._run_library_command(
             "pcs_cfgsync.get_configs",
             {"cluster_name": self.get_argument("cluster_name", "")},
         )
@@ -207,12 +240,17 @@ class GetConfigsHandler(_BaseApiV0Handler):
         self.write(legacy_result)
 
 
-def get_routes(scheduler: Scheduler, auth_provider: AuthProvider) -> RoutesType:
+def get_routes(
+    api_auth_provider_factory: ApiAuthProviderFactoryInterface,
+    scheduler: Scheduler,
+) -> RoutesType:
     def r(url: str) -> str:
         # pylint: disable=invalid-name
         return f"/remote/{url}"
 
-    params = dict(scheduler=scheduler, auth_provider=auth_provider)
+    params = dict(
+        api_auth_provider_factory=api_auth_provider_factory, scheduler=scheduler
+    )
     return [
         # resources
         (r("manage_resource"), ResourceManageHandler, params),
