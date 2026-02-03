@@ -90,7 +90,7 @@ class HttpsServerManage:
         self.__server_is_running = True
         return self
 
-    def reload_certs(self):
+    def reload_certs(self) -> None:
         if not self.server_is_running:
             raise HttpsServerManageException(
                 "Could not reload certificates, server is not running"
