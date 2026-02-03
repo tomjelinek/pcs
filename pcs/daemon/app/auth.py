@@ -10,16 +10,13 @@ from tornado.http1connection import HTTP1Connection
 from tornado.ioloop import IOLoop
 from tornado.web import HTTPError, RequestHandler
 
+from pcs.daemon.app.auth_provider import NotAuthorizedException
 from pcs.lib.auth.const import SUPERUSER
 from pcs.lib.auth.provider import AuthProvider
 from pcs.lib.auth.tools import DesiredUser, get_effective_user
 from pcs.lib.auth.types import AuthUser
 
 from .common import LegacyApiBaseHandler, LegacyApiHandler, RoutesType
-
-
-class NotAuthorizedException(Exception):
-    pass
 
 
 class _BaseLibAuthProvider:

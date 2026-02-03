@@ -5,8 +5,10 @@ from unittest import mock
 from tornado.httpclient import HTTPResponse
 from tornado.web import Application
 
-from pcs.daemon.app.auth import NotAuthorizedException
-from pcs.daemon.app.auth_provider import ApiAuthProviderInterface
+from pcs.daemon.app.auth_provider import (
+    ApiAuthProviderInterface,
+    NotAuthorizedException,
+)
 from pcs.daemon.app.ui_manage import base_handler, get_routes
 from pcs.daemon.async_tasks.scheduler import Scheduler
 from pcs.lib.auth.types import AuthUser

@@ -1,18 +1,9 @@
 import os.path
 
-from pcs.daemon.app.auth import (
-    NotAuthorizedException,
-    PasswordAuthProvider,
-)
-from pcs.daemon.app.common import (
-    BaseHandler,
-    LegacyApiBaseHandler,
-    RoutesType,
-)
-from pcs.daemon.app.ui_common import (
-    AjaxMixin,
-    StaticFile,
-)
+from pcs.daemon.app.auth import PasswordAuthProvider
+from pcs.daemon.app.auth_provider import NotAuthorizedException
+from pcs.daemon.app.common import BaseHandler, LegacyApiBaseHandler, RoutesType
+from pcs.daemon.app.ui_common import AjaxMixin, StaticFile
 from pcs.lib.auth.provider import AuthProvider
 
 from . import session

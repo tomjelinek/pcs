@@ -1,8 +1,8 @@
 from pcs.daemon import ruby_pcsd
-from pcs.daemon.app.auth import NotAuthorizedException
 from pcs.daemon.app.auth_provider import (
     ApiAuthProviderFactoryInterface,
     ApiAuthProviderInterface,
+    NotAuthorizedException,
 )
 from pcs.daemon.app.common import LegacyApiHandler, RoutesType
 from pcs.daemon.app.sinatra_common import SinatraMixin

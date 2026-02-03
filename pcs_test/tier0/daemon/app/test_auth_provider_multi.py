@@ -1,11 +1,11 @@
 from unittest import IsolatedAsyncioTestCase, TestCase, mock
 
-from pcs.daemon.app.auth import NotAuthorizedException
 from pcs.daemon.app.auth_provider import (
     ApiAuthProviderFactoryInterface,
     ApiAuthProviderInterface,
     AuthProviderMulti,
     AuthProviderMultiFactory,
+    NotAuthorizedException,
 )
 from pcs.lib.auth.types import AuthUser
 

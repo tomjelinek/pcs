@@ -3,10 +3,10 @@ from typing import Optional, TypedDict
 from tornado.ioloop import IOLoop
 from tornado.web import RequestHandler
 
-from pcs.daemon.app.auth import NotAuthorizedException
 from pcs.daemon.app.auth_provider import (
     ApiAuthProviderFactoryInterface,
     ApiAuthProviderInterface,
+    NotAuthorizedException,
 )
 from pcs.daemon.app.webui.session import Session, Storage
 from pcs.lib.auth.provider import AuthProvider

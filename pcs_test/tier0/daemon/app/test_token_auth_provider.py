@@ -1,7 +1,9 @@
 from unittest import IsolatedAsyncioTestCase, mock
 
-from pcs.daemon.app.auth import NotAuthorizedException
-from pcs.daemon.app.auth_provider import TokenAuthProvider
+from pcs.daemon.app.auth_provider import (
+    NotAuthorizedException,
+    TokenAuthProvider,
+)
 from pcs.lib.auth.provider import AuthProvider
 from pcs.lib.auth.types import AuthUser
 

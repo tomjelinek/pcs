@@ -9,10 +9,10 @@ from tornado.util import TimeoutError as TornadoTimeoutError
 
 from pcs.daemon import http_server, ruby_pcsd
 from pcs.daemon.app import api_v2, sinatra_remote
-from pcs.daemon.app.auth import NotAuthorizedException
 from pcs.daemon.app.auth_provider import (
     ApiAuthProviderFactoryInterface,
     ApiAuthProviderInterface,
+    NotAuthorizedException,
 )
 from pcs.lib.auth.types import AuthUser
 

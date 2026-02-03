@@ -4,10 +4,10 @@ from typing import Iterable
 from tornado.web import HTTPError
 
 from pcs.common.capabilities import Capability
-from pcs.daemon.app.auth import NotAuthorizedException
 from pcs.daemon.app.auth_provider import (
     ApiAuthProviderFactoryInterface,
     ApiAuthProviderInterface,
+    NotAuthorizedException,
 )
 
 from .common import BaseHandler, LegacyApiHandler, RoutesType

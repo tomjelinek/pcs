@@ -22,10 +22,10 @@ from pcs.common.async_tasks.types import (
 from pcs.common.file import RawFileError
 from pcs.common.pcs_cfgsync_dto import SyncConfigsDto
 from pcs.daemon.app import api_v0, api_v2
-from pcs.daemon.app.auth import NotAuthorizedException
 from pcs.daemon.app.auth_provider import (
     ApiAuthProviderFactoryInterface,
     ApiAuthProviderInterface,
+    NotAuthorizedException,
 )
 from pcs.daemon.async_tasks.scheduler import (
     Scheduler,

@@ -7,10 +7,10 @@ from pcs.daemon.app.api_v0_tools import (
     SimplifiedResult,
     run_library_command_in_scheduler,
 )
-from pcs.daemon.app.auth import NotAuthorizedException
 from pcs.daemon.app.auth_provider import (
     ApiAuthProviderFactoryInterface,
     ApiAuthProviderInterface,
+    NotAuthorizedException,
 )
 from pcs.daemon.app.common import LegacyApiHandler
 from pcs.daemon.app.ui_common import AjaxMixin

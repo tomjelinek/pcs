@@ -7,10 +7,10 @@ from pcs.common import communication, reports
 from pcs.common.async_tasks import types
 from pcs.common.async_tasks.dto import CommandDto, CommandOptionsDto
 from pcs.common.interface.dto import to_dict
-from pcs.daemon.app.auth import NotAuthorizedException
 from pcs.daemon.app.auth_provider import (
     ApiAuthProviderFactoryInterface,
     ApiAuthProviderInterface,
+    NotAuthorizedException,
 )
 from pcs.daemon.app.common import get_legacy_desired_user_from_request
 from pcs.daemon.async_tasks.scheduler import Scheduler, TaskNotFoundError
