@@ -4,31 +4,18 @@ import logging
 import pwd
 import socket
 import struct
-from typing import (
-    Optional,
-    cast,
-)
+from typing import Optional, cast
 
 from tornado.http1connection import HTTP1Connection
 from tornado.ioloop import IOLoop
-from tornado.web import (
-    HTTPError,
-    RequestHandler,
-)
+from tornado.web import HTTPError, RequestHandler
 
 from pcs.lib.auth.const import SUPERUSER
 from pcs.lib.auth.provider import AuthProvider
-from pcs.lib.auth.tools import (
-    DesiredUser,
-    get_effective_user,
-)
+from pcs.lib.auth.tools import DesiredUser, get_effective_user
 from pcs.lib.auth.types import AuthUser
 
-from .common import (
-    LegacyApiBaseHandler,
-    LegacyApiHandler,
-    RoutesType,
-)
+from .common import LegacyApiBaseHandler, LegacyApiHandler, RoutesType
 
 
 class NotAuthorizedException(Exception):
@@ -182,31 +169,35 @@ class UnixSocketAuthProvider(_BaseLibAuthProvider):
 
 
 class LegacyAuth(LegacyApiBaseHandler):
-    _password_auth_provider: PasswordAuthProvider
-    _token_auth_provider: TokenAuthProvider
+    _lib_auth_provider: AuthProvider
 
     def initialize(self, auth_provider: AuthProvider) -> None:
         super().initialize()
-        self._password_auth_provider = PasswordAuthProvider(self, auth_provider)
-        self._token_auth_provider = TokenAuthProvider(self, auth_provider)
+        self._lib_auth_provider = auth_provider
 
     async def auth(self) -> None:
-        try:
-            auth_user = (
-                await self._password_auth_provider.auth_by_username_password(
-                    self.get_body_argument("username") or "",
-                    self.get_body_argument("password") or "",
-                )
-            )
-            token = await self._token_auth_provider.create_token(auth_user)
-            if token:
-                self.write(token)
-            else:
-                raise HTTPError(400, reason="Unable to store token")
-        except NotAuthorizedException:
+        auth_user = await IOLoop.current().run_in_executor(
+            executor=None,
+            func=lambda: self._lib_auth_provider.auth_by_username_password(
+                self.get_body_argument("username") or "",
+                self.get_body_argument("password") or "",
+            ),
+        )
+        if auth_user is None:
             # To stay backward compatible with original ruby implementation,
             # an empty response needs to be returned if authentication fails
-            pass
+            return
+
+        token = await IOLoop.current().run_in_executor(
+            executor=None,
+            func=lambda: self._lib_auth_provider.create_token(
+                auth_user.username
+            ),
+        )
+        if token:
+            self.write(token)
+        else:
+            raise HTTPError(400, reason="Unable to store token")
 
     async def post(self) -> None:
         await self.auth()
