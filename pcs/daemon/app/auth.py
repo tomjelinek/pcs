@@ -10,7 +10,11 @@ from tornado.http1connection import HTTP1Connection
 from tornado.ioloop import IOLoop
 from tornado.web import HTTPError, RequestHandler
 
-from pcs.daemon.app.auth_provider import NotAuthorizedException
+from pcs.daemon.app.auth_provider import (
+    ApiAuthProviderFactoryInterface,
+    ApiAuthProviderInterface,
+    NotAuthorizedException,
+)
 from pcs.lib.auth.const import SUPERUSER
 from pcs.lib.auth.provider import AuthProvider
 from pcs.lib.auth.tools import DesiredUser, get_effective_user
@@ -168,9 +172,9 @@ class UnixSocketAuthProvider(_BaseLibAuthProvider):
 class LegacyAuth(LegacyApiBaseHandler):
     _lib_auth_provider: AuthProvider
 
-    def initialize(self, auth_provider: AuthProvider) -> None:
+    def initialize(self, lib_auth_provider: AuthProvider) -> None:
         super().initialize()
-        self._lib_auth_provider = auth_provider
+        self._lib_auth_provider = lib_auth_provider
 
     async def auth(self) -> None:
         auth_user = await IOLoop.current().run_in_executor(
@@ -239,16 +243,35 @@ class LegacyTokenAuthenticationHandler(LegacyApiHandler):
         raise NotImplementedError()
 
 
-class CheckAuth(LegacyTokenAuthenticationHandler):
+class CheckAuth(LegacyApiHandler):
+    _auth_provider: ApiAuthProviderInterface
+
+    def initialize(
+        self, api_auth_provider_factory: ApiAuthProviderFactoryInterface
+    ) -> None:
+        self._auth_provider = api_auth_provider_factory.create(self)
+
     async def _handle_request(self) -> None:
+        if not self._auth_provider.can_handle_request():
+            raise self.unauthorized()
+
+        try:
+            await self._auth_provider.auth_user()
+        except NotAuthorizedException as e:
+            raise self.unauthorized() from e
+
         self.write('{"success":true}')
 
 
 def get_routes(
-    auth_provider: AuthProvider,
+    lib_auth_provider: AuthProvider,
+    api_auth_provider_factory: ApiAuthProviderFactoryInterface,
 ) -> RoutesType:
-    auth_payload = dict(auth_provider=auth_provider)
     return [
-        ("/remote/auth", LegacyAuth, auth_payload),
-        ("/remote/check_auth", CheckAuth, auth_payload),
+        ("/remote/auth", LegacyAuth, dict(lib_auth_provider=lib_auth_provider)),
+        (
+            "/remote/check_auth",
+            CheckAuth,
+            dict(api_auth_provider_factory=api_auth_provider_factory),
+        ),
     ]
