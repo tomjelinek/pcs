@@ -181,6 +181,7 @@ EXTRA_DIST		= \
 			  tier0/daemon/app/test_app_remote.py \
 			  tier0/daemon/app/test_app_spa.py \
 			  tier0/daemon/app/test_auth_provider_multi.py \
+			  tier0/daemon/app/test_get_legacy_desired_user_from_request.py \
 			  tier0/daemon/app/test_session_auth_provider.py \
 			  tier0/daemon/app/test_token_auth_provider.py \
 			  tier0/daemon/app/test_unix_socket_auth_provider.py \

@@ -7,6 +7,7 @@ from pcs.common import communication, reports
 from pcs.common.async_tasks import types
 from pcs.common.async_tasks.dto import CommandDto, CommandOptionsDto
 from pcs.common.interface.dto import to_dict
+from pcs.daemon import log
 from pcs.daemon.app.auth_provider import (
     ApiAuthProviderFactoryInterface,
     ApiAuthProviderInterface,
@@ -165,7 +166,7 @@ class _BaseApiV1Handler(BaseHandler):
             ) from e
 
     def get_desired_user(self) -> DesiredUser:
-        return get_legacy_desired_user_from_request(self)
+        return get_legacy_desired_user_from_request(self, log.pcsd)
 
     def send_response(
         self, response: communication.dto.InternalCommunicationResultDto

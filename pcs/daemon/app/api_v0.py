@@ -7,6 +7,7 @@ from pcs.common import file_type_codes, reports
 from pcs.common.async_tasks.dto import CommandDto, CommandOptionsDto
 from pcs.common.pcs_cfgsync_dto import SyncConfigsDto
 from pcs.common.str_tools import format_list
+from pcs.daemon import log
 from pcs.daemon.app.api_v0_tools import (
     SimplifiedResult,
     reports_to_str,
@@ -71,14 +72,14 @@ class _BaseApiV0Handler(LegacyApiHandler):
                 f"Required parameters missing: {format_list(missing_params)}"
             )
 
-    def _get_desired_user(self) -> DesiredUser:
-        return get_legacy_desired_user_from_request(self)
-
     async def _get_auth_user(self) -> AuthUser:
         try:
             return await self._auth_provider.auth_user()
         except NotAuthorizedException as e:
             raise self.unauthorized() from e
+
+    def _get_desired_user(self) -> DesiredUser:
+        return get_legacy_desired_user_from_request(self, log.pcsd)
 
     async def _run_library_command(
         self, cmd_name: str, cmd_params: Mapping[str, Any]

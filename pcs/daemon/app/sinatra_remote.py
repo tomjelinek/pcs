@@ -2,7 +2,7 @@ from typing import Optional
 
 from tornado.locks import Lock
 
-from pcs.daemon import ruby_pcsd
+from pcs.daemon import log, ruby_pcsd
 from pcs.daemon.app.auth_provider import (
     ApiAuthProviderFactoryInterface,
     ApiAuthProviderInterface,
@@ -51,7 +51,7 @@ class SinatraRemote(LegacyApiHandler, SinatraMixin):
             return
 
         # allow root user to lower their privileges
-        desired_user = get_legacy_desired_user_from_request(self)
+        desired_user = get_legacy_desired_user_from_request(self, log.pcsd)
         self._effective_user = get_effective_user(real_user, desired_user)
 
     @property

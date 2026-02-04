@@ -1,5 +1,6 @@
 import base64
 import binascii
+from logging import Logger
 from typing import Any, Iterable, Optional, Type
 
 from tornado.web import Finish, HTTPError, RequestHandler
@@ -178,8 +179,11 @@ class RedirectHandler(EnhanceHeadersMixin, TornadoRedirectHandler):
 
 
 def get_legacy_desired_user_from_request(
-    handler: RequestHandler,
+    handler: RequestHandler, logger: Logger
 ) -> DesiredUser:
+    # we only need the request not the whole RequestHandler, but RequestHandler
+    # has nicer API for accessing cookies - making this function cleaner
+
     username = handler.get_cookie("CIB_user")
     groups = []
     if username:
@@ -189,7 +193,5 @@ def get_legacy_desired_user_from_request(
             try:
                 groups = base64.b64decode(groups_raw).decode("utf-8").split(" ")
             except (UnicodeError, binascii.Error):
-                # TODO logging ?
-                # self._auth_logger.warning("Unable to decode users groups")
-                groups = []
+                logger.warning("Unable to decode desired user groups")
     return DesiredUser(username, groups)
