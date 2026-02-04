@@ -1,13 +1,17 @@
 import os.path
+from typing import Optional
 
-from pcs.daemon.app.auth import PasswordAuthProvider
-from pcs.daemon.app.auth_provider import NotAuthorizedException
+from tornado.ioloop import IOLoop
+
 from pcs.daemon.app.common import BaseHandler, LegacyApiBaseHandler, RoutesType
 from pcs.daemon.app.ui_common import AjaxMixin, StaticFile
+from pcs.daemon.app.webui.auth_provider import (
+    PCSD_SESSION,
+    SESSION_COOKIE_OPTIONS,
+)
 from pcs.lib.auth.provider import AuthProvider
 
 from . import session
-from .auth import SessionAuthProvider
 
 
 class SPAHandler(LegacyApiBaseHandler):
@@ -28,38 +32,40 @@ class SPAHandler(LegacyApiBaseHandler):
 
 
 class Login(SPAHandler, AjaxMixin):
-    _password_auth_provider: PasswordAuthProvider
-    _session_auth_provider: SessionAuthProvider
+    _lib_auth_provider: AuthProvider
+    _session_storage: session.Storage
 
     def initialize(
         self,
         session_storage: session.Storage,
-        auth_provider: AuthProvider,
+        lib_auth_provider: AuthProvider,
         index: str,
         fallback: str,
     ) -> None:
-        # pylint: disable=arguments-differ
         SPAHandler.initialize(self, index, fallback)
-        self._password_auth_provider = PasswordAuthProvider(self, auth_provider)
-        self._session_auth_provider = SessionAuthProvider(
-            self, auth_provider, session_storage
-        )
-
-    def prepare(self) -> None:
-        self._session_auth_provider.init_session()
+        self._lib_auth_provider = lib_auth_provider
+        self._session_storage = session_storage
 
     async def post(self):
-        # This is the way of old (ruby) pcsd. Post login generates a session
-        # cookie. No matter if authentication succeeded or failed.
-        try:
-            self._session_auth_provider.update_session(
-                await self._password_auth_provider.auth_by_username_password(
-                    self.get_body_argument("username"),
-                    self.get_body_argument("password"),
-                )
-            )
-        except NotAuthorizedException as e:
-            raise self.unauthorized() from e
+        auth_user = await IOLoop.current().run_in_executor(
+            executor=None,
+            func=lambda: self._lib_auth_provider.auth_by_username_password(
+                self.get_body_argument("username") or "",
+                self.get_body_argument("password") or "",
+            ),
+        )
+        if auth_user is None:
+            raise self.unauthorized()
+
+        sid = self.get_cookie(PCSD_SESSION)
+        session: Optional[session.Session] = None
+        if sid is not None:
+            session = self._session_storage.get(sid)
+
+        if session is None or session.username != auth_user.username:
+            session = self._session_storage.login(auth_user.username)
+
+        self.set_cookie(PCSD_SESSION, session.sid, **SESSION_COOKIE_OPTIONS)
 
 
 class Logout(AjaxMixin, BaseHandler):
@@ -68,22 +74,20 @@ class Logout(AjaxMixin, BaseHandler):
     requests.
     """
 
-    _auth_provider: SessionAuthProvider
+    _session_storage: session.Storage
 
-    def initialize(
-        self,
-        session_storage: session.Storage,
-        auth_provider: AuthProvider,
-    ) -> None:
-        self._auth_provider = SessionAuthProvider(
-            self, auth_provider, session_storage
-        )
-
-    def prepare(self) -> None:
-        self._auth_provider.init_session()
+    def initialize(self, session_storage: session.Storage) -> None:
+        self._session_storage = session_storage
 
     async def get(self):
-        self._auth_provider.session_logout()
+        sid = self.get_cookie(PCSD_SESSION)
+        session: Optional[session.Session] = None
+        if sid is not None:
+            session = self._session_storage.get(sid)
+        if session:
+            self._session_storage.destroy(session.sid)
+
+        self.clear_cookie(PCSD_SESSION)
         self.write("OK")
 
 
@@ -130,15 +134,11 @@ def get_routes(
             Login,
             dict(
                 session_storage=session_storage,
-                auth_provider=auth_provider,
+                lib_auth_provider=auth_provider,
                 index=os.path.join(app_dir, "index.html"),
                 fallback=fallback_page_path,
             ),
         ),
-        (
-            f"{url_prefix}logout",
-            Logout,
-            dict(session_storage=session_storage, auth_provider=auth_provider),
-        ),
+        (f"{url_prefix}logout", Logout, dict(session_storage=session_storage)),
         (f"{url_prefix}.*", SPAHandler, pages),
     ]

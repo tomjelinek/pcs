@@ -16,6 +16,24 @@ from pcs.lib.auth.types import AuthUser
 PCSD_SESSION = "pcsd.sid"
 
 
+class CookieOptions(TypedDict):
+    secure: bool
+    httponly: bool
+    samesite: str
+
+
+# Cookie options for session cookie
+# Matches settings from webui/auth.py for compatibility
+SESSION_COOKIE_OPTIONS: CookieOptions = {
+    "secure": True,
+    "httponly": True,
+    # rhbz#2097393
+    # Prevent a cookie to be sent on cross-site requests, allow it to be
+    # sent when navigating to pcs web UI from an external site.
+    "samesite": "Lax",
+}
+
+
 class SessionAuthProvider(ApiAuthProviderInterface):
     """
     Authentication provider for session-based authentication (WebUI).
@@ -23,22 +41,6 @@ class SessionAuthProvider(ApiAuthProviderInterface):
     Authenticates users via session cookie. Sessions are managed by the
     session storage and identified by the "pcsd.sid" cookie.
     """
-
-    class CookieOptions(TypedDict):
-        secure: bool
-        httponly: bool
-        samesite: str
-
-    # Cookie options for session cookie
-    # Matches settings from webui/auth.py for compatibility
-    _cookie_options: CookieOptions = {
-        "secure": True,
-        "httponly": True,
-        # rhbz#2097393
-        # Prevent a cookie to be sent on cross-site requests, allow it to be
-        # sent when navigating to pcs web UI from an external site.
-        "samesite": "Lax",
-    }
 
     def __init__(
         self,
@@ -88,7 +90,7 @@ class SessionAuthProvider(ApiAuthProviderInterface):
 
         # Update session cookie in response
         self._handler.set_cookie(
-            PCSD_SESSION, self._session.sid, **self._cookie_options
+            PCSD_SESSION, self._session.sid, **SESSION_COOKIE_OPTIONS
         )
 
         return auth_user
