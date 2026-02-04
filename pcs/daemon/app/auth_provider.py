@@ -1,12 +1,3 @@
-"""
-This module reimplements the AuthProviders from pcs.daemon.app.auth module.
-
-This new approach tries to simplify the auth provider structure, and use
-composition over inheritance:
-    - Each auth provider should only use one method for auth
-    - AuthProviderMulti should be used when multiple auth methods are needed
-"""
-
 import pwd
 import socket
 import struct
