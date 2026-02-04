@@ -1,12 +1,43 @@
-from typing import Any, Optional
+from typing import Any, Literal, Optional
+from unittest import mock
 
 from tornado.httputil import HTTPHeaders
 from tornado.testing import AsyncHTTPTestCase
+from tornado.web import RequestHandler
 
 from pcs.common import reports
 from pcs.common.reports.dto import ReportItemDto
 from pcs.common.tools import bin_to_str
 from pcs.daemon.app.api_v0_tools import SimplifiedResult
+from pcs.daemon.app.auth_provider import (
+    ApiAuthProviderFactoryInterface,
+    ApiAuthProviderInterface,
+    NotAuthorizedException,
+)
+from pcs.lib.auth.types import AuthUser
+
+
+class MockAuthProviderFactory(ApiAuthProviderFactoryInterface):
+    auth_result: Literal["ok", "cannot_handle_request", "not_authorized"] = "ok"
+    user = AuthUser("hacluster", ["haclient"])
+
+    def __init__(self):
+        self.provider: Optional[mock.AsyncMock] = None
+
+    def create(self, handler: RequestHandler) -> ApiAuthProviderInterface:
+        del handler
+
+        self.provider = mock.AsyncMock(spec=ApiAuthProviderInterface)
+        match self.auth_result:
+            case "ok":
+                self.provider.can_handle_request.return_value = True
+                self.provider.auth_user.return_value = self.user
+            case "cannot_handle_request":
+                self.provider.can_handle_request.return_value = False
+            case "not_authorized":
+                self.provider.can_handle_request.return_value = True
+                self.provider.auth_user.side_effect = NotAuthorizedException()
+        return self.provider
 
 
 class ApiTestBase(AsyncHTTPTestCase):

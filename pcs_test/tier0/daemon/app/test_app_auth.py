@@ -1,45 +1,15 @@
 import logging
-from typing import Literal, Optional
 from unittest import mock
 
-from pcs.daemon.app import api_v2, auth
-from pcs.daemon.app.auth_provider import (
-    ApiAuthProviderFactoryInterface,
-    ApiAuthProviderInterface,
-    NotAuthorizedException,
-)
+from pcs.daemon.app import auth
 from pcs.lib.auth.provider import AuthProvider
 from pcs.lib.auth.types import AuthUser
 
 from pcs_test.tier0.daemon.app import fixtures_app
+from pcs_test.tier0.daemon.app.fixtures_app_api import MockAuthProviderFactory
 
 # Don't write errors to test output.
 logging.getLogger("tornado.access").setLevel(logging.CRITICAL)
-
-
-class MockAuthProviderFactory(ApiAuthProviderFactoryInterface):
-    auth_result: Literal["ok", "cannot_handle_request", "not_authorized"] = "ok"
-    user = AuthUser("hacluster", ["haclient"])
-
-    def __init__(self):
-        self.provider: Optional[mock.AsyncMock] = None
-
-    def create(
-        self, handler: api_v2._BaseApiV2Handler
-    ) -> ApiAuthProviderInterface:
-        del handler
-
-        self.provider = mock.AsyncMock(spec=ApiAuthProviderInterface)
-        match self.auth_result:
-            case "ok":
-                self.provider.can_handle_request.return_value = True
-                self.provider.auth_user.return_value = self.user
-            case "cannot_handle_request":
-                self.provider.can_handle_request.return_value = False
-            case "not_authorized":
-                self.provider.can_handle_request.return_value = True
-                self.provider.auth_user.side_effect = NotAuthorizedException()
-        return self.provider
 
 
 class Auth(fixtures_app.AppTest):
