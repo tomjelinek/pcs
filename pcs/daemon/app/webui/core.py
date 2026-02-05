@@ -1,5 +1,5 @@
 import os.path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from tornado.ioloop import IOLoop
 
@@ -9,20 +9,22 @@ from pcs.daemon.app.webui.auth_provider import (
     PCSD_SESSION,
     SESSION_COOKIE_OPTIONS,
 )
+from pcs.daemon.app.webui.session import Storage
 from pcs.lib.auth.provider import AuthProvider
 
-from . import session
+if TYPE_CHECKING:
+    from pcs.daemon.app.webui.session import Session
 
 
 class SPAHandler(LegacyApiBaseHandler):
-    __index = None
-    __fallback = None
+    __index: str
+    __fallback: str
 
     def initialize(self, index: str, fallback: str) -> None:
         self.__index = index
         self.__fallback = fallback
 
-    def get(self):
+    def get(self) -> None:
         self.render(
             self.__index
             if os.path.isfile(str(self.__index))
@@ -33,11 +35,11 @@ class SPAHandler(LegacyApiBaseHandler):
 
 class Login(SPAHandler, AjaxMixin):
     _lib_auth_provider: AuthProvider
-    _session_storage: session.Storage
+    _session_storage: Storage
 
-    def initialize(
+    def initialize(  # type: ignore[override]
         self,
-        session_storage: session.Storage,
+        session_storage: Storage,
         lib_auth_provider: AuthProvider,
         index: str,
         fallback: str,
@@ -46,7 +48,7 @@ class Login(SPAHandler, AjaxMixin):
         self._lib_auth_provider = lib_auth_provider
         self._session_storage = session_storage
 
-    async def post(self):
+    async def post(self) -> None:
         auth_user = await IOLoop.current().run_in_executor(
             executor=None,
             func=lambda: self._lib_auth_provider.auth_by_username_password(
@@ -58,7 +60,7 @@ class Login(SPAHandler, AjaxMixin):
             raise self.unauthorized()
 
         sid = self.get_cookie(PCSD_SESSION)
-        session: Optional[session.Session] = None
+        session: Optional[Session] = None
         if sid is not None:
             session = self._session_storage.get(sid)
 
@@ -74,14 +76,14 @@ class Logout(AjaxMixin, BaseHandler):
     requests.
     """
 
-    _session_storage: session.Storage
+    _session_storage: Storage
 
-    def initialize(self, session_storage: session.Storage) -> None:
+    def initialize(self, session_storage: Storage) -> None:
         self._session_storage = session_storage
 
-    async def get(self):
+    async def get(self) -> None:
         sid = self.get_cookie(PCSD_SESSION)
-        session: Optional[session.Session] = None
+        session: Optional[Session] = None
         if sid is not None:
             session = self._session_storage.get(sid)
         if session:
@@ -92,23 +94,22 @@ class Logout(AjaxMixin, BaseHandler):
 
 
 class StaticFileMayBe(StaticFile):
-    # pylint: disable=abstract-method
-    async def get(self, *args, **kwargs):
+    async def get(self, path: str, include_body: bool = True) -> None:
         if not os.path.isdir(str(self.root)):
             # spa is probably not installed
             self.set_status(404, "Not Found")
             return None
-        return await super().get(*args, **kwargs)
+        return await super().get(path, include_body)
 
 
 def get_routes(
     url_prefix: str,
     app_dir: str,
     fallback_page_path: str,
-    session_storage: session.Storage,
+    session_storage: Storage,
     auth_provider: AuthProvider,
 ) -> RoutesType:
-    def static_path(directory=""):
+    def static_path(directory: str = "") -> dict[str, str]:
         return dict(path=os.path.join(app_dir, directory))
 
     pages = dict(
