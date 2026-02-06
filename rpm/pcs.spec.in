@@ -363,27 +363,52 @@ rm -fv %{buildroot}/%{_libdir}/pcsd/vendor/bundle/gems/rackup-*/bin/rackup
 rm -fv %{buildroot}/%{_libdir}/pcsd/vendor/bundle/gems/tilt-*/bin/tilt
 
 
+# Scriptlets documentation:
+#  * https://docs.fedoraproject.org/en-US/packaging-guidelines/Scriptlets/
+#  * https://github.com/systemd/systemd/blob/main/src/rpm/macros.systemd.in
+#  * https://github.com/systemd/systemd/blob/main/src/rpm/systemd-update-helper.in
+#  * https://fedoraproject.org/wiki/Changes/Restart_services_at_end_of_rpm_transaction
+
+%post
+# Set systemd preset for pcsd{,-ruby}.service after install
+%systemd_post pcsd.service pcsd-ruby.service
+
+%post -n %{pcs_snmp_pkg_name}
+# Set systemd preset for pcs_snmp_agent.service after install
+%systemd_post pcs_snmp_agent.service
+
 %preun
+# Stop pcsd{,-ruby}.service before pcs uninstall
 %systemd_preun pcsd.service pcsd-ruby.service
 
-# Mark pcsd and pcs_snmp_agent for restart after upgrade
+%preun -n %{pcs_snmp_pkg_name}
+# Stop pcs_snmp_agent.service before pcs-snmp uninstall
+%systemd_preun pcs_snmp_agent.service
+
 %posttrans
+# Mark pcsd.service for restart after pcs upgrade
 %systemd_posttrans_with_restart pcsd.service
 
 %posttrans -n %{pcs_snmp_pkg_name}
+# Mark pcs_snmp_agent.service for restart after pcs-snmp upgrade
 %systemd_posttrans_with_restart pcs_snmp_agent.service
+
+%posttrans -n %{pcs_standalone_webui_provider_pkg_name}
+# NOTE: Systemd macros cannot be used for pcsd restart from pcs-web-ui because
+# pcs-web-ui does not change unit files and therefore trigger for restart would
+# not happen. Direct call `systemctl try-restart` is used instead.
 
 # Restart pcsd if it is running to reload the Tornado app so it detects
 # presence or absence of the webui backend handler on install/update
 # of pcs-web-ui that contains it
-%posttrans -n %{pcs_standalone_webui_provider_pkg_name}
-systemctl try-restart pcsd.service
+if [ $1 -ge 1 ] && [ -d /run/systemd/system ]; then
+  systemctl try-restart pcsd.service || :
+fi
 
-# Runs only on pcs-web-ui uninstall
-# https://docs.fedoraproject.org/en-US/packaging-guidelines/Scriptlets/
 %postun -n %{pcs_standalone_webui_provider_pkg_name}
-if [ $1 -eq 0 ] ; then
-  systemctl try-restart pcsd.service
+# Restart pcsd.service if running on pcs-web-ui uninstall
+if [ $1 -eq 0 ] && [ -d /run/systemd/system ]; then
+  systemctl try-restart pcsd.service || :
 fi
 
 
