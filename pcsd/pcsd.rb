@@ -4,7 +4,6 @@ require 'openssl'
 require 'logger'
 require 'thread'
 require 'fileutils'
-require 'cgi'
 
 require 'bootstrap.rb'
 require 'resource.rb'

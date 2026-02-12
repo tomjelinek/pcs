@@ -3,7 +3,7 @@
 require 'etc'
 require 'childprocess'
 require 'shellwords'
-require 'cgi'
+require 'rack'
 require 'net/http'
 require 'net/https'
 require 'uri'
@@ -286,7 +286,7 @@ def _get_cookie_list(auth_user, cookies_data)
 
   cookies_data_default.update(cookies_data)
   cookies_data_default.each { |name, value|
-    cookie_list << CGI::Cookie.new('name' => name, 'value' => value).to_s
+    cookie_list << Rack::Utils.set_cookie_header(name, value)
   }
   return cookie_list
 end
