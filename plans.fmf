@@ -78,6 +78,7 @@ prepare:
       - rubygem-test-unit
       - rubygems
       # packages required for rpm build
+      - python3-setuptools_scm
       - redhat-rpm-config
       - rpm-build
       - rpmdevtools
