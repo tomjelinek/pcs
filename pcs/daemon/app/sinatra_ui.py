@@ -31,7 +31,7 @@ class SinatraAjaxProtected(LegacyApiHandler, SinatraMixin, AjaxMixin):
         if not self.__auth_provider.can_handle_request():
             raise self.unauthorized()
 
-    async def _handle_request(self):
+    async def _handle_request(self) -> None:
         try:
             auth_user = await self.__auth_provider.auth_user()
         except NotAuthorizedException as e:

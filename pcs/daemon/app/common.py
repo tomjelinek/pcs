@@ -27,7 +27,10 @@ class EnhanceHeadersMixin:
         # applications running on any subdomain of the domain where pcs web UI
         # is running. The fact that pcs web UI runs on a specific port doesn't
         # matter, subdomains would still be affected.
-        self.set_header("Strict-Transport-Security", "max-age=63072000")
+        self.set_header(  # type: ignore[attr-defined]
+            "Strict-Transport-Security",
+            "max-age=63072000",
+        )
 
     def set_header_nosniff_content_type(self) -> None:
         # The X-Content-Type-Options response HTTP header is a marker used by
@@ -35,7 +38,10 @@ class EnhanceHeadersMixin:
         # Content-Type headers should not be changed and be followed. This
         # allows to opt-out of MIME type sniffing, or, in other words, it is a
         # way to say that the webmasters knew what they were doing.
-        self.set_header("X-Content-Type-Options", "nosniff")
+        self.set_header(  # type: ignore[attr-defined]
+            "X-Content-Type-Options",
+            "nosniff",
+        )
 
     def clear_header_server(self) -> None:
         # The Server header describes the software used by the origin server
@@ -46,7 +52,7 @@ class EnhanceHeadersMixin:
         # When a HTTP request is made against a cluster node running pcsd, the
         # HTTP response contains HTTP Server name in its headers.
         # This is perceived as a security threat.
-        self.clear_header("Server")
+        self.clear_header("Server")  # type: ignore[attr-defined]
 
     def set_header_frame_options(self) -> None:
         # The X-Frame-Options HTTP response header can be used to indicate
@@ -54,7 +60,10 @@ class EnhanceHeadersMixin:
         # <frame>, <iframe> or <object> . Sites can use this to avoid
         # clickjacking attacks, by ensuring that their content is not embedded
         # into other sites.
-        self.set_header("X-Frame-Options", "SAMEORIGIN")
+        self.set_header(  # type: ignore[attr-defined]
+            "X-Frame-Options",
+            "SAMEORIGIN",
+        )
 
     def set_header_content_security_policy(self) -> None:
         # The HTTP Content-Security-Policy (CSP) frame-ancestors directive
@@ -72,7 +81,7 @@ class EnhanceHeadersMixin:
         # default-src directive and uses this value for it.
         # 'self' refers to the origin from which the protected document is
         # being served, including the same URL scheme and port number.
-        self.set_header(
+        self.set_header(  # type: ignore[attr-defined]
             "Content-Security-Policy",
             "frame-ancestors 'self'; default-src 'self'",
         )
@@ -86,7 +95,10 @@ class EnhanceHeadersMixin:
         # inline JavaScript ('unsafe-inline'), they can still provide
         # protections for users of older web browsers that don't yet support
         # CSP.
-        self.set_header("X-Xss-Protection", "1; mode=block")
+        self.set_header(  # type: ignore[attr-defined]
+            "X-Xss-Protection",
+            "1; mode=block",
+        )
 
     def set_header_cache_control(self) -> None:
         # rhbz#2097383
@@ -98,14 +110,20 @@ class EnhanceHeadersMixin:
         #   validated with the origin server before each reuse. This was
         #   requested probably as a fallback for caches which don't support
         #   no-store.
-        self.set_header("Cache-Control", "no-store, no-cache")
-        self.set_header("Pragma", "no-cache")
+        self.set_header(  # type: ignore[attr-defined]
+            "Cache-Control",
+            "no-store, no-cache",
+        )
+        self.set_header(  # type: ignore[attr-defined]
+            "Pragma",
+            "no-cache",
+        )
 
     def clear_header_cache_control(self) -> None:
         # Revert headers to default to allow caching, useful e.g. for static
         # content.
-        self.clear_header("Cache-Control")
-        self.clear_header("Pragma")
+        self.clear_header("Cache-Control")  # type: ignore[attr-defined]
+        self.clear_header("Pragma")  # type: ignore[attr-defined]
 
     def set_header_referrer(self) -> None:
         # rhbz#2097391
@@ -113,7 +131,10 @@ class EnhanceHeadersMixin:
         # contain name of nodes/resources/etc.). This is mostly future-proof
         # hardening as there are currently little to no links to external
         # sites.
-        self.set_header("Referrer-Policy", "no-referrer")
+        self.set_header(  # type: ignore[attr-defined]
+            "Referrer-Policy",
+            "no-referrer",
+        )
 
     def set_default_headers(self) -> None:
         """
@@ -161,11 +182,11 @@ class LegacyApiHandler(LegacyApiBaseHandler):
     async def _handle_request(self) -> None:
         raise NotImplementedError()
 
-    async def get(self, *args, **kwargs):
+    async def get(self, *args: Any, **kwargs: Any) -> None:
         del args, kwargs
         await self._handle_request()
 
-    async def post(self, *args, **kwargs):
+    async def post(self, *args: Any, **kwargs: Any) -> None:
         del args, kwargs
         await self._handle_request()
 
