@@ -130,6 +130,15 @@ class _BaseApiV1Handler(BaseHandler):
     json: Optional[dict[str, Any]] = None
     _auth_provider: ApiAuthProviderInterface
 
+    _real_user: AuthUser
+    _desired_user: DesiredUser
+
+    _NOT_AUTHORIZED_ERROR = ApiError(
+        response_code=communication.const.COM_STATUS_NOT_AUTHORIZED,
+        response_msg="",
+        http_code=401,
+    )
+
     def initialize(
         self,
         api_auth_provider_factory: ApiAuthProviderFactoryInterface,
@@ -139,34 +148,28 @@ class _BaseApiV1Handler(BaseHandler):
         self._auth_provider = api_auth_provider_factory.create(self)
         self.scheduler = scheduler
 
-    def prepare(self) -> None:
-        self.add_header("Content-Type", "application/json")
-
-        if not self._auth_provider.can_handle_request():
-            raise ApiError(
-                response_code=communication.const.COM_STATUS_NOT_AUTHORIZED,
-                response_msg="",
-                http_code=401,
-            )
-
-        # JSON preprocessing
+    def _preprocess_json(self) -> None:
         try:
             self.json = json.loads(self.request.body)
         except json.JSONDecodeError as e:
             raise InvalidInputError() from e
 
-    async def get_auth_user(self) -> AuthUser:
-        try:
-            return await self._auth_provider.auth_user()
-        except NotAuthorizedException as e:
-            raise ApiError(
-                response_code=communication.const.COM_STATUS_NOT_AUTHORIZED,
-                response_msg="",
-                http_code=401,
-            ) from e
+    async def prepare(self) -> None:
+        self.add_header("Content-Type", "application/json")
 
-    def get_desired_user(self) -> DesiredUser:
-        return get_legacy_desired_user_from_request(self, log.pcsd)
+        # Authentication
+        if not self._auth_provider.can_handle_request():
+            raise self._NOT_AUTHORIZED_ERROR
+        try:
+            self._real_user = await self._auth_provider.auth_user()
+        except NotAuthorizedException as e:
+            raise self._NOT_AUTHORIZED_ERROR from e
+        self._desired_user = get_legacy_desired_user_from_request(
+            self, log.pcsd
+        )
+
+        # JSON preprocessing
+        self._preprocess_json()
 
     def send_response(
         self, response: communication.dto.InternalCommunicationResultDto
@@ -203,8 +206,6 @@ class _BaseApiV1Handler(BaseHandler):
     async def process_request(
         self, cmd: str
     ) -> communication.dto.InternalCommunicationResultDto:
-        real_user = await self.get_auth_user()
-        desired_user = self.get_desired_user()
         if cmd not in API_V1_MAP:
             raise ApiError(
                 communication.const.COM_STATUS_UNKNOWN_CMD,
@@ -218,19 +219,19 @@ class _BaseApiV1Handler(BaseHandler):
             # the scheduler/executor handles whether the command is run with
             # real_user permissions or the effective user is used
             options=CommandOptionsDto(
-                effective_username=desired_user.username,
-                effective_groups=list(desired_user.groups)
-                if desired_user.groups
+                effective_username=self._desired_user.username,
+                effective_groups=list(self._desired_user.groups)
+                if self._desired_user.groups
                 else None,
             ),
         )
         task_ident = self.scheduler.new_task(
-            Command(command_dto, is_legacy_command=True), real_user
+            Command(command_dto, is_legacy_command=True), self._real_user
         )
 
         try:
             task_result_dto = await self.scheduler.wait_for_task(
-                task_ident, real_user
+                task_ident, self._real_user
             )
         except TaskNotFoundError as e:
             raise ApiError(
@@ -277,14 +278,7 @@ class LegacyApiV1Handler(_BaseApiV1Handler):
     def _get_cmd() -> str:
         raise NotImplementedError()
 
-    def prepare(self) -> None:
-        self.add_header("Content-Type", "application/json")
-        if not self._auth_provider.can_handle_request():
-            raise ApiError(
-                response_code=communication.const.COM_STATUS_NOT_AUTHORIZED,
-                response_msg="",
-                http_code=401,
-            )
+    def _preprocess_json(self) -> None:
         try:
             self.json = json.loads(self.get_argument("data_json", default=""))
         except json.JSONDecodeError as e:
