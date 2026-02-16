@@ -21,11 +21,14 @@ from pcs_test.tools.misc import (
     skip_unless_webui_installed,
 )
 
-LOGIN_BODY = {"username": fixtures_app.USER, "password": fixtures_app.PASSWORD}
 PREFIX = "/ui/"
 
 # Don't write errors to test output.
 logging.getLogger("tornado.access").setLevel(logging.CRITICAL)
+
+
+def login_body(username: str, password: str) -> dict[str, str]:
+    return {"username": username, "password": password}
 
 
 class AppTest(fixtures_app_webui.AppTest):
@@ -106,7 +109,11 @@ class Login(AppTest):
     def test_login_attempt_failed(self):
         self.auth_provider_mock.return_value = None
 
-        response = self.post(f"{PREFIX}login", LOGIN_BODY, is_ajax=True)
+        response = self.post(
+            f"{PREFIX}login",
+            login_body(fixtures_app.USER, fixtures_app.PASSWORD),
+            is_ajax=True,
+        )
 
         self.assert_unauth_ajax(response)
         self.assert_sid_not_in_response(response)
@@ -119,7 +126,11 @@ class Login(AppTest):
             fixtures_app.USER, fixtures_app.GROUPS
         )
 
-        response = self.post(f"{PREFIX}login", LOGIN_BODY, is_ajax=True)
+        response = self.post(
+            f"{PREFIX}login",
+            login_body(fixtures_app.USER, fixtures_app.PASSWORD),
+            is_ajax=True,
+        )
 
         self.assert_success_response(response, "")
         self.assert_sid_in_response(response)
@@ -134,7 +145,10 @@ class Login(AppTest):
         )
 
         response = self.post(
-            f"{PREFIX}login", LOGIN_BODY, is_ajax=True, sid=session1.sid
+            f"{PREFIX}login",
+            login_body(fixtures_app.USER, fixtures_app.PASSWORD),
+            is_ajax=True,
+            sid=session1.sid,
         )
 
         self.assert_success_response(response, "")
@@ -152,12 +166,11 @@ class Login(AppTest):
             "different user", fixtures_app.GROUPS
         )
 
-        login_body = {
-            "username": "different user",
-            "password": fixtures_app.PASSWORD,
-        }
         response = self.post(
-            f"{PREFIX}login", login_body, is_ajax=True, sid=session1.sid
+            f"{PREFIX}login",
+            login_body("different user", fixtures_app.PASSWORD),
+            is_ajax=True,
+            sid=session1.sid,
         )
 
         self.assert_success_response(response, "")
