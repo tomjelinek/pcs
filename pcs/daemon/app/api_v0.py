@@ -1,5 +1,5 @@
 import json
-from typing import Any, Mapping, Optional, cast
+from typing import Any, Mapping, cast
 
 from tornado.web import Finish
 
@@ -37,7 +37,8 @@ class _BaseApiV0Handler(LegacyApiHandler):
 
     _auth_provider: ApiAuthProviderInterface
     _scheduler: Scheduler
-    _real_user: Optional[AuthUser]
+    _real_user: AuthUser
+    _desired_user: DesiredUser
 
     def initialize(
         self,
@@ -50,6 +51,15 @@ class _BaseApiV0Handler(LegacyApiHandler):
     async def prepare(self) -> None:
         if not self._auth_provider.can_handle_request():
             raise self.unauthorized()
+
+        try:
+            self._real_user = await self._auth_provider.auth_user()
+        except NotAuthorizedException as e:
+            raise self.unauthorized() from e
+
+        self._desired_user = get_legacy_desired_user_from_request(
+            self, log.pcsd
+        )
 
     async def _handle_request(self) -> None:
         """
@@ -72,37 +82,26 @@ class _BaseApiV0Handler(LegacyApiHandler):
                 f"Required parameters missing: {format_list(missing_params)}"
             )
 
-    async def _get_auth_user(self) -> AuthUser:
-        try:
-            return await self._auth_provider.auth_user()
-        except NotAuthorizedException as e:
-            raise self.unauthorized() from e
-
-    def _get_desired_user(self) -> DesiredUser:
-        return get_legacy_desired_user_from_request(self, log.pcsd)
-
     async def _run_library_command(
         self, cmd_name: str, cmd_params: Mapping[str, Any]
     ) -> SimplifiedResult:
         """
         Helper method for calling pcs library commands
         """
-        real_user = await self._get_auth_user()
-        desired_user = self._get_desired_user()
         command_dto = CommandDto(
             command_name=cmd_name,
             params=dict(cmd_params),
             # the scheduler/executor handles whether the command is run with
             # real_user permissions or the effective user is used
             options=CommandOptionsDto(
-                effective_username=desired_user.username,
-                effective_groups=list(desired_user.groups)
-                if desired_user.groups
+                effective_username=self._desired_user.username,
+                effective_groups=list(self._desired_user.groups)
+                if self._desired_user.groups
                 else None,
             ),
         )
         return await run_library_command_in_scheduler(
-            self._scheduler, command_dto, real_user, self._error
+            self._scheduler, command_dto, self._real_user, self._error
         )
 
 
