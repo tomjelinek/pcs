@@ -67,8 +67,8 @@ class CheckAuth(LegacyApiHandler):
 
 
 def get_routes(
-    lib_auth_provider: AuthProvider,
     api_auth_provider_factory: ApiAuthProviderFactoryInterface,
+    lib_auth_provider: AuthProvider,
 ) -> RoutesType:
     return [
         ("/remote/auth", LegacyAuth, dict(lib_auth_provider=lib_auth_provider)),

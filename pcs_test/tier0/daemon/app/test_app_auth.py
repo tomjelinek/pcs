@@ -23,7 +23,7 @@ class Auth(fixtures_app.AppTest):
         super().setUp()
 
     def get_routes(self):
-        return auth.get_routes(self.lib_auth_provider, None)
+        return auth.get_routes(None, self.lib_auth_provider)
 
     def _mock_auth_provider_method(self, method_name, return_value=None):
         method_patcher = mock.patch.object(AuthProvider, method_name)
@@ -67,7 +67,7 @@ class CheckAuth(fixtures_app.AppTest):
         super().setUp()
 
     def get_routes(self):
-        return auth.get_routes(None, self.api_auth_provider_factory_mock)
+        return auth.get_routes(self.api_auth_provider_factory_mock, None)
 
     def make_request(self):
         return self.get("/remote/check_auth")
