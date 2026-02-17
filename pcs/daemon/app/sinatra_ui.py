@@ -7,6 +7,7 @@ from pcs.daemon.app.auth_provider import (
 from pcs.daemon.app.common import LegacyApiHandler, RoutesType
 from pcs.daemon.app.sinatra_common import SinatraMixin
 from pcs.daemon.app.ui_common import AjaxMixin
+from pcs.lib.auth.types import AuthUser
 
 
 class SinatraAjaxProtected(LegacyApiHandler, SinatraMixin, AjaxMixin):
@@ -15,7 +16,8 @@ class SinatraAjaxProtected(LegacyApiHandler, SinatraMixin, AjaxMixin):
     It allows to use this urls only for ajax calls.
     """
 
-    __auth_provider: ApiAuthProviderInterface
+    _auth_provider: ApiAuthProviderInterface
+    _auth_user: AuthUser
 
     def initialize(
         self,
@@ -23,21 +25,22 @@ class SinatraAjaxProtected(LegacyApiHandler, SinatraMixin, AjaxMixin):
         api_auth_provider_factory: ApiAuthProviderFactoryInterface,
     ) -> None:
         self.initialize_sinatra(ruby_pcsd_wrapper)
-        self.__auth_provider = api_auth_provider_factory.create(self)
+        self._auth_provider = api_auth_provider_factory.create(self)
 
-    def prepare(self) -> None:
+    async def prepare(self) -> None:
         if not self.is_ajax:
             raise self.unauthorized()
-        if not self.__auth_provider.can_handle_request():
+        if not self._auth_provider.can_handle_request():
             raise self.unauthorized()
-
-    async def _handle_request(self) -> None:
         try:
-            auth_user = await self.__auth_provider.auth_user()
+            self._auth_user = await self._auth_provider.auth_user()
         except NotAuthorizedException as e:
             raise self.unauthorized() from e
 
-        result = await self.ruby_pcsd_wrapper.request(auth_user, self.request)
+    async def _handle_request(self) -> None:
+        result = await self.ruby_pcsd_wrapper.request(
+            self._auth_user, self.request
+        )
         self.send_sinatra_result(result)
 
 
