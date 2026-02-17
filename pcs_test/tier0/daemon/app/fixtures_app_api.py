@@ -18,7 +18,7 @@ from pcs.lib.auth.types import AuthUser
 
 
 class MockAuthProviderFactory(ApiAuthProviderFactoryInterface):
-    auth_result: Literal["ok", "cannot_handle_request", "not_authorized"] = "ok"
+    auth_result: Literal["ok", "not_authorized"] = "ok"
     user = AuthUser("hacluster", ["haclient"])
 
     def __init__(self):
@@ -30,12 +30,8 @@ class MockAuthProviderFactory(ApiAuthProviderFactoryInterface):
         self.provider = mock.AsyncMock(spec=ApiAuthProviderInterface)
         match self.auth_result:
             case "ok":
-                self.provider.can_handle_request.return_value = True
                 self.provider.auth_user.return_value = self.user
-            case "cannot_handle_request":
-                self.provider.can_handle_request.return_value = False
             case "not_authorized":
-                self.provider.can_handle_request.return_value = True
                 self.provider.auth_user.side_effect = NotAuthorizedException()
         return self.provider
 

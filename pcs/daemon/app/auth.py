@@ -55,9 +55,6 @@ class CheckAuth(LegacyApiHandler):
         self._auth_provider = api_auth_provider_factory.create(self)
 
     async def _handle_request(self) -> None:
-        if not self._auth_provider.can_handle_request():
-            raise self.unauthorized()
-
         try:
             await self._auth_provider.auth_user()
         except NotAuthorizedException as e:

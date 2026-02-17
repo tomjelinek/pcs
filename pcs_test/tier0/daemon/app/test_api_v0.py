@@ -198,7 +198,6 @@ class BaseApiV0Handler(ApiV0Test):
             ),
         )
         self.assertEqual(response.code, 200)
-        self.api_auth_provider_factory.provider.can_handle_request.assert_called_once_with()
         self.api_auth_provider_factory.provider.auth_user.assert_called_once_with()
 
     def test_task_not_found(self):
@@ -210,16 +209,6 @@ class BaseApiV0Handler(ApiV0Test):
         self.assert_body(response.body, "Internal server error")
         self.assertEqual(response.code, 500)
 
-    def test_auth_cannot_handle_request(self):
-        self.api_auth_provider_factory.auth_result = "cannot_handle_request"
-        self.command_executed = False
-
-        response = self.fetch(self.url)
-        self.assert_body(response.body, '{"notauthorized":"true"}')
-        self.assertEqual(response.code, 401)
-        self.api_auth_provider_factory.provider.can_handle_request.assert_called_once_with()
-        self.api_auth_provider_factory.provider.auth_user.assert_not_called()
-
     def test_not_authorized(self):
         self.api_auth_provider_factory.auth_result = "not_authorized"
         self.command_executed = False
@@ -227,7 +216,6 @@ class BaseApiV0Handler(ApiV0Test):
         response = self.fetch(self.url)
         self.assert_body(response.body, '{"notauthorized":"true"}')
         self.assertEqual(response.code, 401)
-        self.api_auth_provider_factory.provider.can_handle_request.assert_called_once_with()
         self.api_auth_provider_factory.provider.auth_user.assert_called_once_with()
 
     def test_permission_denied(self):

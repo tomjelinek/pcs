@@ -69,7 +69,6 @@ class SinatraRemote(AppTest):
             self.get("/remote/", headers=self.headers)
         )
 
-        self.api_auth_provider_factory.provider.can_handle_request.assert_called_once_with()
         self.api_auth_provider_factory.provider.auth_user.assert_called_once_with()
         self.assertTrue(self.wrapper.was_run_ruby_called)
         self.assertEqual(
@@ -77,23 +76,12 @@ class SinatraRemote(AppTest):
             {"username": "hacluster", "groups": ["haclient"]},
         )
 
-    def test_auth_cannot_handle_request(self):
-        self.api_auth_provider_factory.auth_result = "cannot_handle_request"
-
-        response = self.get("/remote/", headers=self.headers)
-
-        self.assertEqual(response.code, 401)
-        self.api_auth_provider_factory.provider.can_handle_request.assert_called_once_with()
-        self.api_auth_provider_factory.provider.auth_user.assert_not_called()
-        self.assertFalse(self.wrapper.was_run_ruby_called)
-
     def test_auth_not_authorized(self):
         self.api_auth_provider_factory.auth_result = "not_authorized"
 
         response = self.get("/remote/", headers=self.headers)
 
         self.assertEqual(response.code, 401)
-        self.api_auth_provider_factory.provider.can_handle_request.assert_called_once_with()
         self.api_auth_provider_factory.provider.auth_user.assert_called_once_with()
         self.assertFalse(self.wrapper.was_run_ruby_called)
 
@@ -110,7 +98,6 @@ class SinatraRemote(AppTest):
             self.get("/remote/", headers=self.headers)
         )
 
-        self.api_auth_provider_factory.provider.can_handle_request.assert_called_once_with()
         self.api_auth_provider_factory.provider.auth_user.assert_called_once_with()
         self.assertTrue(self.wrapper.was_run_ruby_called)
         self.assertEqual(

@@ -37,9 +37,6 @@ class SinatraRemote(LegacyApiHandler, SinatraMixin):
         self.initialize_sinatra(ruby_pcsd_wrapper)
 
     async def prepare(self) -> None:
-        if not self._auth_provider.can_handle_request():
-            raise self.unauthorized()
-
         try:
             real_user = await self._auth_provider.auth_user()
         except NotAuthorizedException as e:

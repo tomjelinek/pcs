@@ -77,20 +77,7 @@ class CheckAuth(fixtures_app.AppTest):
 
         self.assertEqual(response.code, 200)
         self.assertEqual(response.body, b'{"success":true}')
-        self.api_auth_provider_factory_mock.provider.can_handle_request.assert_called_once_with()
         self.api_auth_provider_factory_mock.provider.auth_user.assert_called_once_with()
-
-    def test_auth_cannot_handler_request(self):
-        self.api_auth_provider_factory_mock.auth_result = (
-            "cannot_handle_request"
-        )
-
-        response = self.make_request()
-
-        self.assertEqual(response.code, 401)
-        self.assertEqual(response.body, b'{"notauthorized":"true"}')
-        self.api_auth_provider_factory_mock.provider.can_handle_request.assert_called_once_with()
-        self.api_auth_provider_factory_mock.provider.auth_user.assert_not_called()
 
     def test_auth_not_authorized(self):
         self.api_auth_provider_factory_mock.auth_result = "not_authorized"
@@ -99,5 +86,4 @@ class CheckAuth(fixtures_app.AppTest):
 
         self.assertEqual(response.code, 401)
         self.assertEqual(response.body, b'{"notauthorized":"true"}')
-        self.api_auth_provider_factory_mock.provider.can_handle_request.assert_called_once_with()
         self.api_auth_provider_factory_mock.provider.auth_user.assert_called_once_with()

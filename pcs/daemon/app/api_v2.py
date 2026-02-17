@@ -74,8 +74,6 @@ class _BaseApiV2Handler(BaseHandler):
         self.set_header("Content-Type", "application/json")
 
         # Authentication
-        if not self._auth_provider.can_handle_request():
-            raise APIError(http_code=401)
         try:
             self._auth_user = await self._auth_provider.auth_user()
         except NotAuthorizedException as e:

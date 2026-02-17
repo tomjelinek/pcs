@@ -49,9 +49,6 @@ class _BaseApiV0Handler(LegacyApiHandler):
         self._scheduler = scheduler
 
     async def prepare(self) -> None:
-        if not self._auth_provider.can_handle_request():
-            raise self.unauthorized()
-
         try:
             self._real_user = await self._auth_provider.auth_user()
         except NotAuthorizedException as e:

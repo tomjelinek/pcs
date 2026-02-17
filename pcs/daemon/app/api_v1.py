@@ -158,8 +158,6 @@ class _BaseApiV1Handler(BaseHandler):
         self.add_header("Content-Type", "application/json")
 
         # Authentication
-        if not self._auth_provider.can_handle_request():
-            raise self._NOT_AUTHORIZED_ERROR
         try:
             self._real_user = await self._auth_provider.auth_user()
         except NotAuthorizedException as e:

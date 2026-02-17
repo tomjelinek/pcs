@@ -106,15 +106,6 @@ class BaseAjaxProtectedManageHandlerTest(UiManageTest):
         response = self.fetch(self.url, add_ajax_header=False)
         self.assertEqual(response.code, 401)
         self.assert_body(response.body, '{"notauthorized":"true"}')
-        self.api_auth_provider_factory.provider.can_handle_request.assert_not_called()
-        self.api_auth_provider_factory.provider.auth_user.assert_not_called()
-
-    def test_prepare_requires_auth_provider_available(self):
-        self.api_auth_provider_factory.auth_result = "cannot_handle_request"
-        response = self.fetch(self.url)
-        self.assertEqual(response.code, 401)
-        self.assert_body(response.body, '{"notauthorized":"true"}')
-        self.api_auth_provider_factory.provider.can_handle_request.assert_called_once_with()
         self.api_auth_provider_factory.provider.auth_user.assert_not_called()
 
     def test_process_request_auth_failure(self):
@@ -122,7 +113,6 @@ class BaseAjaxProtectedManageHandlerTest(UiManageTest):
         response = self.fetch(self.url)
         self.assertEqual(response.code, 401)
         self.assert_body(response.body, '{"notauthorized":"true"}')
-        self.api_auth_provider_factory.provider.can_handle_request.assert_called_once_with()
         self.api_auth_provider_factory.provider.auth_user.assert_called_once_with()
 
 

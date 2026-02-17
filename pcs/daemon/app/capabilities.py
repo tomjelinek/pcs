@@ -34,8 +34,6 @@ class LegacyCapabilitiesHandler(LegacyApiHandler):
         self._capabilities = capabilities
 
     async def prepare(self) -> None:
-        if not self._auth_provider.can_handle_request():
-            raise self.unauthorized()
         try:
             await self._auth_provider.auth_user()
         except NotAuthorizedException as e:
@@ -59,8 +57,6 @@ class CapabilitiesHandler(BaseHandler):
         self._capabilities = capabilities
 
     async def prepare(self) -> None:
-        if not self._auth_provider.can_handle_request():
-            raise HTTPError(401)
         try:
             await self._auth_provider.auth_user()
         except NotAuthorizedException as e:

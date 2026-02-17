@@ -206,19 +206,7 @@ class BaseApiV2HandlerTest(ApiV2Test):
         data = self.assert_json_response(response, 200)
         self.assertTrue(data["success"])
         self.assertEqual(data["user"], "hacluster")
-        self.auth_provider_factory.provider.can_handle_request.assert_called_once_with()
         self.auth_provider_factory.provider.auth_user.assert_called_once_with()
-
-    def test_authentication_failure_can_handle_false(self):
-        self.auth_provider_factory.auth_result = "cannot_handle_request"
-
-        response = self.fetch(
-            self.url, body=json.dumps(self.make_command_dict())
-        )
-
-        self.assert_error_response(response, 401)
-        self.auth_provider_factory.provider.can_handle_request.assert_called_once_with()
-        self.auth_provider_factory.provider.auth_user.assert_not_called()
 
     def test_authentication_failure_auth_user_raises(self):
         self.auth_provider_factory.auth_result = "not_authorized"
@@ -228,14 +216,12 @@ class BaseApiV2HandlerTest(ApiV2Test):
         )
 
         self.assert_error_response(response, 401)
-        self.auth_provider_factory.provider.can_handle_request.assert_called_once_with()
         self.auth_provider_factory.provider.auth_user.assert_called_once_with()
 
     def test_malformed_json(self):
         response = self.fetch(self.url, body="not valid json")
 
         self.assert_error_response(response, 400, "Malformed JSON data.")
-        self.auth_provider_factory.provider.can_handle_request.assert_called_once_with()
         self.auth_provider_factory.provider.auth_user.assert_called_once_with()
 
     def test_wrong_content_type(self):
@@ -250,7 +236,6 @@ class BaseApiV2HandlerTest(ApiV2Test):
             400,
             "Request body is missing, has wrong format or wrong/missing headers.",
         )
-        self.auth_provider_factory.provider.can_handle_request.assert_called_once_with()
         self.auth_provider_factory.provider.auth_user.assert_called_once_with()
 
     def test_missing_required_field(self):
@@ -266,7 +251,6 @@ class BaseApiV2HandlerTest(ApiV2Test):
                     400,
                     f'Required key "{field}" is missing in request body.',
                 )
-                self.auth_provider_factory.provider.can_handle_request.assert_called_once_with()
                 self.auth_provider_factory.provider.auth_user.assert_called_once_with()
 
     def test_unexpected_field(self):
@@ -280,7 +264,6 @@ class BaseApiV2HandlerTest(ApiV2Test):
             400,
             "Request body contains unexpected keys: unexpected_field.",
         )
-        self.auth_provider_factory.provider.can_handle_request.assert_called_once_with()
         self.auth_provider_factory.provider.auth_user.assert_called_once_with()
 
     def test_type_mismatch(self):
@@ -290,7 +273,6 @@ class BaseApiV2HandlerTest(ApiV2Test):
         response = self.fetch(self.url, body=json.dumps(command_dict))
 
         self.assert_error_response(response, 400, "Malformed request body.")
-        self.auth_provider_factory.provider.can_handle_request.assert_called_once_with()
         self.auth_provider_factory.provider.auth_user.assert_called_once_with()
 
     def test_validation_with_nested_dto(self):
@@ -304,7 +286,6 @@ class BaseApiV2HandlerTest(ApiV2Test):
             400,
             "Request body contains unexpected keys: unexpected_nested_field.",
         )
-        self.auth_provider_factory.provider.can_handle_request.assert_called_once_with()
         self.auth_provider_factory.provider.auth_user.assert_called_once_with()
 
     def test_empty_params(self):
@@ -314,7 +295,6 @@ class BaseApiV2HandlerTest(ApiV2Test):
 
         data = self.assert_json_response(response, 200)
         self.assertEqual(data["success"], True)
-        self.auth_provider_factory.provider.can_handle_request.assert_called_once_with()
         self.auth_provider_factory.provider.auth_user.assert_called_once_with()
 
 
@@ -322,7 +302,6 @@ class NewTaskHandlerTest(ApiV2Test):
     url = "/api/v2/task/create"
 
     def tearDown(self):
-        self.auth_provider_factory.provider.can_handle_request.assert_called_once_with()
         self.auth_provider_factory.provider.auth_user.assert_called_once_with()
 
     def test_success(self):
@@ -353,7 +332,6 @@ class RunTaskHandlerTest(ApiV2Test):
     url = "/api/v2/task/run"
 
     def tearDown(self):
-        self.auth_provider_factory.provider.can_handle_request.assert_called_once_with()
         self.auth_provider_factory.provider.auth_user.assert_called_once_with()
 
     def test_success(self):
@@ -408,7 +386,6 @@ class TaskInfoHandlerTest(ApiV2Test):
     url = "/api/v2/task/result"
 
     def tearDown(self):
-        self.auth_provider_factory.provider.can_handle_request.assert_called_once_with()
         self.auth_provider_factory.provider.auth_user.assert_called_once_with()
 
     def test_success(self):
@@ -453,7 +430,6 @@ class KillTaskHandlerTest(ApiV2Test):
     url = "/api/v2/task/kill"
 
     def tearDown(self):
-        self.auth_provider_factory.provider.can_handle_request.assert_called_once_with()
         self.auth_provider_factory.provider.auth_user.assert_called_once_with()
 
     def test_success(self):
