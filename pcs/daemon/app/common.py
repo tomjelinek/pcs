@@ -215,4 +215,9 @@ def get_legacy_desired_user_from_request(
                 groups = base64.b64decode(groups_raw).decode("utf-8").split(" ")
             except (UnicodeError, binascii.Error):
                 logger.warning("Unable to decode desired user groups")
+    logger.debug(
+        "Effective user: username=%s groups=%s",
+        username or "",
+        ",".join(groups),
+    )
     return DesiredUser(username, groups)

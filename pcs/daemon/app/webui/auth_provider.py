@@ -1,8 +1,10 @@
+from logging import Logger
 from typing import Optional, TypedDict
 
 from tornado.ioloop import IOLoop
 from tornado.web import RequestHandler
 
+from pcs.daemon import log
 from pcs.daemon.app.auth_provider import (
     ApiAuthProviderFactoryInterface,
     ApiAuthProviderInterface,
@@ -47,6 +49,7 @@ class SessionAuthProvider(ApiAuthProviderInterface):
         handler: RequestHandler,
         lib_auth_provider: AuthProvider,
         session_storage: Storage,
+        logger: Logger,
     ) -> None:
         """
         Initialize session auth provider.
@@ -59,6 +62,7 @@ class SessionAuthProvider(ApiAuthProviderInterface):
         self._lib_auth_provider = lib_auth_provider
         self._session_storage = session_storage
         self._session: Optional[Session] = None
+        self._logger = logger
 
     @property
     def __sid_from_client(self) -> Optional[str]:
@@ -74,7 +78,12 @@ class SessionAuthProvider(ApiAuthProviderInterface):
         return self._session is not None
 
     async def auth_user(self) -> AuthUser:
+        self._logger.debug("Attempting authentication via session")
         if not self.can_handle_request():
+            self._logger.debug(
+                "Credentials for authentication via session not provided, "
+                "or the session is not known to pcsd"
+            )
             raise NotAuthorizedException()
 
         # mypy complains that self.__session can be None when passed into
@@ -105,5 +114,5 @@ class SessionAuthProviderFactory(ApiAuthProviderFactoryInterface):
 
     def create(self, handler: RequestHandler) -> SessionAuthProvider:
         return SessionAuthProvider(
-            handler, self._lib_auth_provider, self._session_storage
+            handler, self._lib_auth_provider, self._session_storage, log.pcsd
         )

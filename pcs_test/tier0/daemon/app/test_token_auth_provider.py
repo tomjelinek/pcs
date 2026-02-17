@@ -9,6 +9,8 @@ from pcs.lib.auth.types import AuthUser
 
 
 class TokenAuthProviderTest(IsolatedAsyncioTestCase):
+    LOGGER_MESSAGE = "Attempting authentication via token"
+
     def setUp(self):
         self.handler = mock.Mock()
         self.lib_auth_provider = mock.Mock(spec=AuthProvider)
@@ -16,7 +18,10 @@ class TokenAuthProviderTest(IsolatedAsyncioTestCase):
         self.handler.get_cookie.side_effect = lambda name: self.cookie_jar.get(
             name
         )
-        self.provider = TokenAuthProvider(self.handler, self.lib_auth_provider)
+        self.mock_logger = mock.Mock(spec_set=["debug"])
+        self.provider = TokenAuthProvider(
+            self.handler, self.lib_auth_provider, self.mock_logger
+        )
 
     def test_can_handle_request_returns_true_with_cookie(self):
         self.assertTrue(self.provider.can_handle_request())
@@ -33,12 +38,23 @@ class TokenAuthProviderTest(IsolatedAsyncioTestCase):
 
         self.assertEqual(result, expected_user)
         self.lib_auth_provider.auth_by_token.assert_called_once_with("TOKEN")
+        self.mock_logger.debug.assert_called_once_with(self.LOGGER_MESSAGE)
 
     async def test_auth_user_error_no_cookie(self):
         del self.cookie_jar["token"]
 
         with self.assertRaises(NotAuthorizedException):
             await self.provider.auth_user()
+
+        self.mock_logger.debug.assert_has_calls(
+            [
+                mock.call(self.LOGGER_MESSAGE),
+                mock.call(
+                    "Credentials for authentication via token not provided"
+                ),
+            ]
+        )
+        self.assertEqual(len(self.mock_logger.debug.mock_calls), 2)
 
     async def test_auth_user_error_login_fails(self):
         self.lib_auth_provider.auth_by_token.return_value = None
@@ -47,3 +63,4 @@ class TokenAuthProviderTest(IsolatedAsyncioTestCase):
             await self.provider.auth_user()
 
         self.lib_auth_provider.auth_by_token.assert_called_once_with("TOKEN")
+        self.mock_logger.debug.assert_called_once_with(self.LOGGER_MESSAGE)
