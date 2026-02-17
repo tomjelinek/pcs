@@ -36,8 +36,6 @@ class _TestHandler(api_v2._BaseApiV2Handler):
 
     async def post(self) -> None:
         """Echo back parsed JSON for testing base class functionality"""
-        # test authentication
-        auth_user = await self.get_auth_user()
         if self.json is None:
             raise api_v2.RequestBodyMissingError()
         # test DTO validation
@@ -46,7 +44,7 @@ class _TestHandler(api_v2._BaseApiV2Handler):
             json.dumps(
                 {
                     "success": True,
-                    "user": auth_user.username,
+                    "user": self._auth_user.username,
                     "command": command_dto.command_name,
                 }
             )
@@ -238,7 +236,7 @@ class BaseApiV2HandlerTest(ApiV2Test):
 
         self.assert_error_response(response, 400, "Malformed JSON data.")
         self.auth_provider_factory.provider.can_handle_request.assert_called_once_with()
-        self.auth_provider_factory.provider.auth_user.assert_not_called()
+        self.auth_provider_factory.provider.auth_user.assert_called_once_with()
 
     def test_wrong_content_type(self):
         response = self.fetch(

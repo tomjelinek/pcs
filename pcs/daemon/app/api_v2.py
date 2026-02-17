@@ -56,7 +56,8 @@ class _BaseApiV2Handler(BaseHandler):
     scheduler: Scheduler
     json: Optional[Dict[str, Any]] = None
     logger: logging.Logger
-    __auth_provider: ApiAuthProviderInterface
+    _auth_provider: ApiAuthProviderInterface
+    _auth_user: AuthUser
 
     def initialize(
         self,
@@ -67,12 +68,18 @@ class _BaseApiV2Handler(BaseHandler):
         self.scheduler = scheduler
         # TODO: Turn into a constant
         self.logger = logging.getLogger("pcs.daemon.scheduler")
-        self.__auth_provider = api_auth_provider_factory.create(self)
+        self._auth_provider = api_auth_provider_factory.create(self)
 
-    def prepare(self) -> None:
+    async def prepare(self) -> None:
         self.set_header("Content-Type", "application/json")
-        if not self.__auth_provider.can_handle_request():
+
+        # Authentication
+        if not self._auth_provider.can_handle_request():
             raise APIError(http_code=401)
+        try:
+            self._auth_user = await self._auth_provider.auth_user()
+        except NotAuthorizedException as e:
+            raise APIError(http_code=401) from e
 
         # JSON preprocessing
         if (
@@ -85,12 +92,6 @@ class _BaseApiV2Handler(BaseHandler):
                 raise APIError(
                     http_code=400, error_msg="Malformed JSON data."
                 ) from exc
-
-    async def get_auth_user(self) -> AuthUser:
-        try:
-            return await self.__auth_provider.auth_user()
-        except NotAuthorizedException as e:
-            raise APIError(http_code=401) from e
 
     @staticmethod
     def _from_dict_exc_handled(
@@ -152,12 +153,13 @@ class NewTaskHandler(_BaseApiV2Handler):
     """Create a new task from command"""
 
     async def post(self) -> None:
-        auth_user = await self.get_auth_user()
         if self.json is None:
             raise RequestBodyMissingError()
 
         command_dto = self._from_dict_exc_handled(CommandDto, self.json)
-        task_ident = self.scheduler.new_task(Command(command_dto), auth_user)
+        task_ident = self.scheduler.new_task(
+            Command(command_dto), self._auth_user
+        )
         self.write(json.dumps(to_dict(TaskIdentDto(task_ident))))
 
 
@@ -165,18 +167,19 @@ class RunTaskHandler(_BaseApiV2Handler):
     """Run command synchronously"""
 
     async def post(self) -> None:
-        auth_user = await self.get_auth_user()
         if self.json is None:
             raise RequestBodyMissingError()
 
         command_dto = self._from_dict_exc_handled(CommandDto, self.json)
-        task_ident = self.scheduler.new_task(Command(command_dto), auth_user)
+        task_ident = self.scheduler.new_task(
+            Command(command_dto), self._auth_user
+        )
         try:
             self.write(
                 json.dumps(
                     to_dict(
                         await self.scheduler.wait_for_task(
-                            task_ident, auth_user
+                            task_ident, self._auth_user
                         )
                     )
                 )
@@ -189,14 +192,13 @@ class TaskInfoHandler(_BaseApiV2Handler):
     """Get task status"""
 
     async def get(self) -> None:
-        auth_user = await self.get_auth_user()
         try:
             task_ident = self.get_query_argument("task_ident")
             self.write(
                 json.dumps(
                     to_dict(
                         self.scheduler.get_task(
-                            cast(str, task_ident), auth_user
+                            cast(str, task_ident), self._auth_user
                         )
                     )
                 )
@@ -217,13 +219,12 @@ class KillTaskHandler(_BaseApiV2Handler):
     """Stop execution of a task"""
 
     async def post(self) -> None:
-        auth_user = await self.get_auth_user()
         if self.json is None:
             raise RequestBodyMissingError()
 
         task_ident_dto = self._from_dict_exc_handled(TaskIdentDto, self.json)
         try:
-            self.scheduler.kill_task(task_ident_dto.task_ident, auth_user)
+            self.scheduler.kill_task(task_ident_dto.task_ident, self._auth_user)
         except TaskNotFoundError as exc:
             raise APIError(
                 http_code=404,
