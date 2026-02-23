@@ -133,12 +133,6 @@ class _BaseApiV1Handler(BaseHandler):
     _real_user: AuthUser
     _desired_user: DesiredUser
 
-    _NOT_AUTHORIZED_ERROR = ApiError(
-        response_code=communication.const.COM_STATUS_NOT_AUTHORIZED,
-        response_msg="",
-        http_code=401,
-    )
-
     def initialize(
         self,
         api_auth_provider_factory: ApiAuthProviderFactoryInterface,
@@ -161,7 +155,11 @@ class _BaseApiV1Handler(BaseHandler):
         try:
             self._real_user = await self._auth_provider.auth_user()
         except NotAuthorizedException as e:
-            raise self._NOT_AUTHORIZED_ERROR from e
+            raise ApiError(
+                response_code=communication.const.COM_STATUS_NOT_AUTHORIZED,
+                response_msg="",
+                http_code=401,
+            ) from e
         self._desired_user = get_legacy_desired_user_from_request(
             self, log.pcsd
         )
