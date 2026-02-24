@@ -23,7 +23,7 @@ def from_external_source(level, created: float, usecs: int, message, group_id):
         lno=0,
         # Message from ruby does not need args.
         msg=message,
-        args=[],
+        args=tuple(),
         # The exception information makes not sense here.
         exc_info=None,
     )

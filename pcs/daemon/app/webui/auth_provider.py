@@ -1,12 +1,14 @@
+from logging import Logger
 from typing import Optional, TypedDict
 
 from tornado.ioloop import IOLoop
 from tornado.web import RequestHandler
 
-from pcs.daemon.app.auth import NotAuthorizedException
+from pcs.daemon import log
 from pcs.daemon.app.auth_provider import (
     ApiAuthProviderFactoryInterface,
     ApiAuthProviderInterface,
+    NotAuthorizedException,
 )
 from pcs.daemon.app.webui.session import Session, Storage
 from pcs.lib.auth.provider import AuthProvider
@@ -14,6 +16,24 @@ from pcs.lib.auth.types import AuthUser
 
 # Constants for session authentication
 PCSD_SESSION = "pcsd.sid"
+
+
+class CookieOptions(TypedDict):
+    secure: bool
+    httponly: bool
+    samesite: str
+
+
+# Cookie options for session cookie
+# Matches settings from webui/auth.py for compatibility
+SESSION_COOKIE_OPTIONS: CookieOptions = {
+    "secure": True,
+    "httponly": True,
+    # rhbz#2097393
+    # Prevent a cookie to be sent on cross-site requests, allow it to be
+    # sent when navigating to pcs web UI from an external site.
+    "samesite": "Lax",
+}
 
 
 class SessionAuthProvider(ApiAuthProviderInterface):
@@ -24,27 +44,12 @@ class SessionAuthProvider(ApiAuthProviderInterface):
     session storage and identified by the "pcsd.sid" cookie.
     """
 
-    class CookieOptions(TypedDict):
-        secure: bool
-        httponly: bool
-        samesite: str
-
-    # Cookie options for session cookie
-    # Matches settings from webui/auth.py for compatibility
-    _cookie_options: CookieOptions = {
-        "secure": True,
-        "httponly": True,
-        # rhbz#2097393
-        # Prevent a cookie to be sent on cross-site requests, allow it to be
-        # sent when navigating to pcs web UI from an external site.
-        "samesite": "Lax",
-    }
-
     def __init__(
         self,
         handler: RequestHandler,
         lib_auth_provider: AuthProvider,
         session_storage: Storage,
+        logger: Logger,
     ) -> None:
         """
         Initialize session auth provider.
@@ -57,6 +62,7 @@ class SessionAuthProvider(ApiAuthProviderInterface):
         self._lib_auth_provider = lib_auth_provider
         self._session_storage = session_storage
         self._session: Optional[Session] = None
+        self._logger = logger
 
     @property
     def __sid_from_client(self) -> Optional[str]:
@@ -72,7 +78,12 @@ class SessionAuthProvider(ApiAuthProviderInterface):
         return self._session is not None
 
     async def auth_user(self) -> AuthUser:
+        self._logger.debug("Attempting authentication via session")
         if not self.can_handle_request():
+            self._logger.debug(
+                "Credentials for authentication via session not provided, "
+                "or the session is not known to pcsd"
+            )
             raise NotAuthorizedException()
 
         # mypy complains that self.__session can be None when passed into
@@ -88,7 +99,7 @@ class SessionAuthProvider(ApiAuthProviderInterface):
 
         # Update session cookie in response
         self._handler.set_cookie(
-            PCSD_SESSION, self._session.sid, **self._cookie_options
+            PCSD_SESSION, self._session.sid, **SESSION_COOKIE_OPTIONS
         )
 
         return auth_user
@@ -103,5 +114,5 @@ class SessionAuthProviderFactory(ApiAuthProviderFactoryInterface):
 
     def create(self, handler: RequestHandler) -> SessionAuthProvider:
         return SessionAuthProvider(
-            handler, self._lib_auth_provider, self._session_storage
+            handler, self._lib_auth_provider, self._session_storage, log.pcsd
         )

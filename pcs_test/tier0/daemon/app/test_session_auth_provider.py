@@ -30,6 +30,8 @@ class MockStorage:
 
 @skip_unless_webui_installed()
 class SessionAuthProviderTest(IsolatedAsyncioTestCase):
+    LOGGER_MESSAGE = "Attempting authentication via session"
+
     def setUp(self):
         self.handler = mock.Mock()
         cookie_jar = {webui.auth_provider.PCSD_SESSION: "session123"}
@@ -41,32 +43,28 @@ class SessionAuthProviderTest(IsolatedAsyncioTestCase):
 
         self.lib_auth_provider = mock.Mock(spec=AuthProvider)
 
+        self.mock_logger = mock.Mock(spec_set=["debug"])
+        self.provider = webui.auth_provider.SessionAuthProvider(
+            self.handler,
+            self.lib_auth_provider,
+            self.session_storage,
+            self.mock_logger,
+        )
+
     def test_can_handle_request_returns_true_with_session(self):
         self.session_storage.add_session("session123", "bob")
-
-        provider = webui.auth_provider.SessionAuthProvider(
-            self.handler, self.lib_auth_provider, self.session_storage
-        )
-
-        self.assertTrue(provider.can_handle_request())
+        self.assertTrue(self.provider.can_handle_request())
 
     def test_can_handle_request_returns_false_without_session(self):
-        provider = webui.auth_provider.SessionAuthProvider(
-            self.handler, self.lib_auth_provider, self.session_storage
-        )
-
-        self.assertFalse(provider.can_handle_request())
+        self.assertFalse(self.provider.can_handle_request())
 
     async def test_auth_user_success_with_valid_session(self):
         self.session_storage.add_session("session123", "bob")
 
-        provider = webui.auth_provider.SessionAuthProvider(
-            self.handler, self.lib_auth_provider, self.session_storage
-        )
         expected_user = AuthUser("bob", ["users"])
         self.lib_auth_provider.login_user.return_value = expected_user
 
-        result = await provider.auth_user()
+        result = await self.provider.auth_user()
 
         self.assertEqual(result, expected_user)
         self.lib_auth_provider.login_user.assert_called_once_with("bob")
@@ -77,28 +75,32 @@ class SessionAuthProviderTest(IsolatedAsyncioTestCase):
             httponly=True,
             samesite="Lax",
         )
+        self.mock_logger.debug.assert_called_once_with(self.LOGGER_MESSAGE)
 
     async def test_auth_user_raises_when_session_is_none(self):
-        provider = webui.auth_provider.SessionAuthProvider(
-            self.handler, self.lib_auth_provider, self.session_storage
-        )
-
         with self.assertRaises(NotAuthorizedException):
-            await provider.auth_user()
+            await self.provider.auth_user()
 
         self.lib_auth_provider.login_user.assert_not_called()
         self.handler.set_cookie.assert_not_called()
+        self.mock_logger.debug.assert_has_calls(
+            [
+                mock.call(self.LOGGER_MESSAGE),
+                mock.call(
+                    "Credentials for authentication via session not provided, "
+                    "or the session is not known to pcsd"
+                ),
+            ]
+        )
+        self.assertEqual(len(self.mock_logger.debug.mock_calls), 2)
 
     async def test_auth_user_raises_when_login_fails(self):
         self.session_storage.add_session("session123", "bob")
-
-        provider = webui.auth_provider.SessionAuthProvider(
-            self.handler, self.lib_auth_provider, self.session_storage
-        )
         self.lib_auth_provider.login_user.return_value = None
 
         with self.assertRaises(NotAuthorizedException):
-            await provider.auth_user()
+            await self.provider.auth_user()
 
         self.lib_auth_provider.login_user.assert_called_once_with("bob")
         self.handler.set_cookie.assert_not_called()
+        self.mock_logger.debug.assert_called_once_with(self.LOGGER_MESSAGE)

@@ -6,15 +6,24 @@ from pcs.lib.auth.provider import AuthProvider
 from pcs.lib.auth.types import AuthUser
 
 from pcs_test.tier0.daemon.app import fixtures_app
+from pcs_test.tier0.daemon.app.fixtures_app_api import MockAuthProviderFactory
 
 # Don't write errors to test output.
 logging.getLogger("tornado.access").setLevel(logging.CRITICAL)
 
 
-class AppTest(fixtures_app.AppTest):
+class Auth(fixtures_app.AppTest):
     def setUp(self):
-        self.auth_provider = AuthProvider(logging.getLogger("test logger"))
+        self.lib_auth_provider = AuthProvider(logging.getLogger("test logger"))
+        self.auth_provider_mock = self._mock_auth_provider_method(
+            "auth_by_username_password"
+        )
+        self.token = "new token"
+        self._mock_auth_provider_method("create_token", self.token)
         super().setUp()
+
+    def get_routes(self):
+        return auth.get_routes(None, self.lib_auth_provider)
 
     def _mock_auth_provider_method(self, method_name, return_value=None):
         method_patcher = mock.patch.object(AuthProvider, method_name)
@@ -23,21 +32,6 @@ class AppTest(fixtures_app.AppTest):
         if return_value:
             method_mock.return_value = return_value
         return method_mock
-
-    def get_routes(self):
-        return auth.get_routes(
-            self.auth_provider,
-        )
-
-
-class Auth(AppTest):
-    def setUp(self):
-        super().setUp()
-        self.auth_provider_mock = self._mock_auth_provider_method(
-            "auth_by_username_password"
-        )
-        self.token = "new token"
-        self._mock_auth_provider_method("create_token", self.token)
 
     def make_auth_request(self):
         return self.post(
@@ -65,3 +59,31 @@ class Auth(AppTest):
         self.auth_provider_mock.assert_called_once_with(
             fixtures_app.USER, fixtures_app.PASSWORD
         )
+
+
+class CheckAuth(fixtures_app.AppTest):
+    def setUp(self):
+        self.api_auth_provider_factory_mock = MockAuthProviderFactory()
+        super().setUp()
+
+    def get_routes(self):
+        return auth.get_routes(self.api_auth_provider_factory_mock, None)
+
+    def make_request(self):
+        return self.get("/remote/check_auth")
+
+    def test_success(self):
+        response = self.make_request()
+
+        self.assertEqual(response.code, 200)
+        self.assertEqual(response.body, b'{"success":true}')
+        self.api_auth_provider_factory_mock.provider.auth_user.assert_called_once_with()
+
+    def test_auth_not_authorized(self):
+        self.api_auth_provider_factory_mock.auth_result = "not_authorized"
+
+        response = self.make_request()
+
+        self.assertEqual(response.code, 401)
+        self.assertEqual(response.body, b'{"notauthorized":"true"}')
+        self.api_auth_provider_factory_mock.provider.auth_user.assert_called_once_with()

@@ -1,11 +1,11 @@
 from unittest import IsolatedAsyncioTestCase, TestCase, mock
 
-from pcs.daemon.app.auth import NotAuthorizedException
 from pcs.daemon.app.auth_provider import (
     ApiAuthProviderFactoryInterface,
     ApiAuthProviderInterface,
     AuthProviderMulti,
     AuthProviderMultiFactory,
+    NotAuthorizedException,
 )
 from pcs.lib.auth.types import AuthUser
 
@@ -39,11 +39,18 @@ class MockAuthProvider(ApiAuthProviderInterface):
 
 
 class AuthProviderMultiTest(IsolatedAsyncioTestCase):
+    LOGGER_MESSAGE = (
+        "Credentials not provided for any of the authentication methods"
+    )
+
+    def setUp(self):
+        self.mock_logger = mock.Mock(spec_set=["debug"])
+
     def test_can_handle_request_returns_true_on_first(self):
         provider1 = MockAuthProvider(can_handle_request_result=True)
         provider2 = MockAuthProvider(can_handle_request_result=True)
 
-        multi = AuthProviderMulti([provider1, provider2])
+        multi = AuthProviderMulti([provider1, provider2], self.mock_logger)
 
         self.assertTrue(multi.can_handle_request())
         self.assertTrue(provider1.can_handle_request_called)
@@ -54,7 +61,9 @@ class AuthProviderMultiTest(IsolatedAsyncioTestCase):
         provider2 = MockAuthProvider(can_handle_request_result=False)
         provider3 = MockAuthProvider(can_handle_request_result=True)
 
-        multi = AuthProviderMulti([provider1, provider2, provider3])
+        multi = AuthProviderMulti(
+            [provider1, provider2, provider3], self.mock_logger
+        )
 
         self.assertTrue(multi.can_handle_request())
         self.assertTrue(provider1.can_handle_request_called)
@@ -65,7 +74,7 @@ class AuthProviderMultiTest(IsolatedAsyncioTestCase):
         provider1 = MockAuthProvider(can_handle_request_result=False)
         provider2 = MockAuthProvider(can_handle_request_result=False)
 
-        multi = AuthProviderMulti([provider1, provider2])
+        multi = AuthProviderMulti([provider1, provider2], self.mock_logger)
 
         self.assertFalse(multi.can_handle_request())
         self.assertTrue(provider1.can_handle_request_called)
@@ -81,7 +90,7 @@ class AuthProviderMultiTest(IsolatedAsyncioTestCase):
             can_handle_request_result=True, auth_user_result=user2
         )
 
-        multi = AuthProviderMulti([provider1, provider2])
+        multi = AuthProviderMulti([provider1, provider2], self.mock_logger)
 
         result = await multi.auth_user()
 
@@ -91,6 +100,7 @@ class AuthProviderMultiTest(IsolatedAsyncioTestCase):
         # Second provider should not be checked or used
         self.assertFalse(provider2.can_handle_request_called)
         self.assertFalse(provider2.auth_user_called)
+        self.mock_logger.debug.assert_not_called()
 
     async def test_auth_user_falls_back_to_second_provider(self):
         user2 = AuthUser("user2", ["group2"])
@@ -99,7 +109,7 @@ class AuthProviderMultiTest(IsolatedAsyncioTestCase):
             can_handle_request_result=True, auth_user_result=user2
         )
 
-        multi = AuthProviderMulti([provider1, provider2])
+        multi = AuthProviderMulti([provider1, provider2], self.mock_logger)
 
         result = await multi.auth_user()
 
@@ -108,15 +118,18 @@ class AuthProviderMultiTest(IsolatedAsyncioTestCase):
         self.assertFalse(provider1.auth_user_called)
         self.assertTrue(provider2.can_handle_request_called)
         self.assertTrue(provider2.auth_user_called)
+        self.mock_logger.debug.assert_not_called()
 
     async def test_no_providers_available(self):
         provider1 = MockAuthProvider(can_handle_request_result=False)
         provider2 = MockAuthProvider(can_handle_request_result=False)
 
-        multi = AuthProviderMulti([provider1, provider2])
+        multi = AuthProviderMulti([provider1, provider2], self.mock_logger)
 
         with self.assertRaises(NotAuthorizedException):
             await multi.auth_user()
+
+        self.mock_logger.debug.assert_called_once_with(self.LOGGER_MESSAGE)
 
 
 class MockAuthProviderFactory(ApiAuthProviderFactoryInterface):

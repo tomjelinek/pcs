@@ -10,11 +10,14 @@ from pcs.lib.auth.types import AuthUser
 
 
 class UnixSocketAuthProviderTest(IsolatedAsyncioTestCase):
+    LOGGER_MESSAGE = "Attempting authentication via unix socket"
+
     def setUp(self):
         self.handler = mock.Mock()
         self.lib_auth_provider = mock.Mock(spec=AuthProvider)
+        self.mock_logger = mock.Mock(spec_set=["debug"])
         self.provider = UnixSocketAuthProvider(
-            self.handler, self.lib_auth_provider
+            self.handler, self.lib_auth_provider, self.mock_logger
         )
 
     def _setup_unix_socket(self, uid=1000, username="testuser"):
@@ -79,7 +82,6 @@ class UnixSocketAuthProviderTest(IsolatedAsyncioTestCase):
         self.assertEqual(username, "alice")
 
     def test_get_unix_socket_user_treats_root_as_superuser(self):
-        """Test _get_unix_socket_user treats UID 0 as SUPERUSER."""
         self._setup_unix_socket(uid=0)
 
         username = self.provider._get_unix_socket_user()
@@ -102,6 +104,7 @@ class UnixSocketAuthProviderTest(IsolatedAsyncioTestCase):
 
         self.assertEqual(result, expected_user)
         self.lib_auth_provider.login_user.assert_called_once_with("testuser")
+        self.mock_logger.debug.assert_called_once_with(self.LOGGER_MESSAGE)
 
     async def test_auth_user_success_with_root(self):
         self._setup_unix_socket(uid=0)  # Root user
@@ -113,6 +116,7 @@ class UnixSocketAuthProviderTest(IsolatedAsyncioTestCase):
         self.assertEqual(result, expected_user)
         # Root should be treated as SUPERUSER
         self.lib_auth_provider.login_user.assert_called_once_with(SUPERUSER)
+        self.mock_logger.debug.assert_called_once_with(self.LOGGER_MESSAGE)
 
     async def test_auth_user_raises_when_login_fails(self):
         self._setup_unix_socket(uid=1000, username="testuser")
@@ -121,8 +125,21 @@ class UnixSocketAuthProviderTest(IsolatedAsyncioTestCase):
         with self.assertRaises(NotAuthorizedException):
             await self.provider.auth_user()
 
+        self.mock_logger.debug.assert_called_once_with(self.LOGGER_MESSAGE)
+
     async def test_auth_user_raises_when_not_unix_socket(self):
         self._setup_tcp_socket()
 
         with self.assertRaises(NotAuthorizedException):
             await self.provider.auth_user()
+
+        self.mock_logger.debug.assert_has_calls(
+            [
+                mock.call(self.LOGGER_MESSAGE),
+                mock.call(
+                    "Cannot authenticate using unix socket, unix socket was "
+                    "not used to make the request"
+                ),
+            ]
+        )
+        self.assertEqual(len(self.mock_logger.debug.mock_calls), 2)

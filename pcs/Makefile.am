@@ -230,7 +230,6 @@ EXTRA_DIST		= \
 			  daemon/app/ui_manage/__init__.py \
 			  daemon/app/ui_manage/routes.py \
 			  daemon/app/webui/__init__.py \
-			  daemon/app/webui/auth.py \
 			  daemon/app/webui/auth_provider.py \
 			  daemon/app/webui/core.py \
 			  daemon/app/webui/session.py \

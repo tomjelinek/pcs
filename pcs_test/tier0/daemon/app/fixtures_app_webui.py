@@ -18,7 +18,7 @@ class AppTest(fixtures_app.AppTest):
             if "headers" not in kwargs:
                 kwargs["headers"] = {}
             kwargs["headers"]["Cookie"] = (
-                f"{webui.auth.PCSD_SESSION}={kwargs['sid']}"
+                f"{webui.auth_provider.PCSD_SESSION}={kwargs['sid']}"
             )
             del kwargs["sid"]
 

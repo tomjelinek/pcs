@@ -1,3 +1,4 @@
+import base64
 import logging
 from unittest import mock
 from urllib.parse import urlencode
@@ -5,15 +6,11 @@ from urllib.parse import urlencode
 from tornado.locks import Lock
 from tornado.util import TimeoutError as TornadoTimeoutError
 
-from pcs.daemon import (
-    http_server,
-    ruby_pcsd,
-)
+from pcs.daemon import http_server, ruby_pcsd
 from pcs.daemon.app import sinatra_remote
-from pcs.lib.auth.provider import AuthProvider
-from pcs.lib.auth.types import AuthUser
 
 from pcs_test.tier0.daemon.app import fixtures_app
+from pcs_test.tier0.daemon.app.fixtures_app_api import MockAuthProviderFactory
 
 # Don't write errors to test output.
 logging.getLogger("tornado.access").setLevel(logging.CRITICAL)
@@ -26,32 +23,21 @@ class AppTest(fixtures_app.AppTest):
             spec_set=http_server.HttpsServerManage
         )
         self.lock = Lock()
-        self.auth_provider = AuthProvider(logging.getLogger("test logger"))
+        self.api_auth_provider_factory = MockAuthProviderFactory()
         super().setUp()
-
-    def _mock_auth_provider_method(self, method_name, return_value=None):
-        method_patcher = mock.patch.object(AuthProvider, method_name)
-        self.addCleanup(method_patcher.stop)
-        method_mock = method_patcher.start()
-        if return_value:
-            method_mock.return_value = return_value
-        return method_mock
 
     def get_routes(self):
         return sinatra_remote.get_routes(
+            self.api_auth_provider_factory,
             self.wrapper,
             self.lock,
             self.https_server_manage,
-            self.auth_provider,
         )
 
 
 class SetCerts(AppTest):
     def setUp(self):
         super().setUp()
-        self._mock_auth_provider_method(
-            "auth_by_token", AuthUser(username="user", groups=("group1",))
-        )
         self.headers = {"Cookie": "token=1234"}
 
     def test_it_asks_for_cert_reload_if_ruby_succeeds(self):
@@ -76,14 +62,47 @@ class SetCerts(AppTest):
 class SinatraRemote(AppTest):
     def setUp(self):
         super().setUp()
-        self._mock_auth_provider_method(
-            "auth_by_token", AuthUser(username="user", groups=("group1",))
-        )
         self.headers = {"Cookie": "token=1234"}
 
     def test_take_result_from_ruby(self):
         self.assert_wrappers_response(
             self.get("/remote/", headers=self.headers)
+        )
+
+        self.api_auth_provider_factory.provider.auth_user.assert_called_once_with()
+        self.assertTrue(self.wrapper.was_run_ruby_called)
+        self.assertEqual(
+            self.wrapper.run_ruby_payload,
+            {"username": "hacluster", "groups": ["haclient"]},
+        )
+
+    def test_auth_not_authorized(self):
+        self.api_auth_provider_factory.auth_result = "not_authorized"
+
+        response = self.get("/remote/", headers=self.headers)
+
+        self.assertEqual(response.code, 401)
+        self.api_auth_provider_factory.provider.auth_user.assert_called_once_with()
+        self.assertFalse(self.wrapper.was_run_ruby_called)
+
+    def test_success_desired_user(self):
+        groups_encoded = base64.b64encode(
+            "haclient wheel square".encode("utf-8")
+        ).decode("utf-8")
+        self.headers["Cookie"] = (
+            self.headers["Cookie"]
+            + ";CIB_user=foo"
+            + f";CIB_user_groups={groups_encoded}"
+        )
+        self.assert_wrappers_response(
+            self.get("/remote/", headers=self.headers)
+        )
+
+        self.api_auth_provider_factory.provider.auth_user.assert_called_once_with()
+        self.assertTrue(self.wrapper.was_run_ruby_called)
+        self.assertEqual(
+            self.wrapper.run_ruby_payload,
+            {"username": "foo", "groups": ["haclient", "wheel", "square"]},
         )
 
 
@@ -98,12 +117,6 @@ class SyncConfigMutualExclusive(AppTest):
     response. If there is a lock handler waits and the request fails because of
     timeout and test detects an expected timeout error.
     """
-
-    def setUp(self):
-        super().setUp()
-        self._mock_auth_provider_method(
-            "auth_by_token", AuthUser(username="user", groups=("group1",))
-        )
 
     def fetch_set_sync_options(self, method):
         def fetch_sync_options():

@@ -145,20 +145,23 @@ def configure_app(  # noqa: PLR0913
             api_v2_auth_factory = auth_provider.AuthProviderMultiFactory(
                 [token_auth_factory, socket_auth_factory]
             )
+        api_auth_factory = auth_provider.AuthProviderMultiFactory(
+            [token_auth_factory, socket_auth_factory]
+        )
 
         routes = api_v2.get_routes(api_v2_auth_factory, async_scheduler)
-        routes.extend(api_v1.get_routes(async_scheduler, lib_auth_provider))
-        routes.extend(api_v0.get_routes(async_scheduler, lib_auth_provider))
-        routes.extend(auth.get_routes(lib_auth_provider))
+        routes.extend(api_v1.get_routes(api_auth_factory, async_scheduler))
+        routes.extend(api_v0.get_routes(api_auth_factory, async_scheduler))
+        routes.extend(auth.get_routes(api_auth_factory, lib_auth_provider))
         routes.extend(
-            capabilities_app.get_routes(lib_auth_provider, pcsd_capabilities)
+            capabilities_app.get_routes(api_auth_factory, pcsd_capabilities)
         )
         routes.extend(
             sinatra_remote.get_routes(
+                api_auth_factory,
                 ruby_pcsd_wrapper,
                 sync_config_lock,
                 https_server_manage,
-                lib_auth_provider,
             )
         )
 

@@ -64,10 +64,10 @@ class SinatraAjaxProtectedSession(fixtures_app_webui.AppTest):
     def assert_session_in_response(self, response, sid=None):
         self.assertTrue("Set-Cookie" in response.headers)
         cookie = parse_cookie(response.headers["Set-Cookie"])
-        self.assertTrue(webui.auth.PCSD_SESSION, cookie)
+        self.assertTrue(webui.auth_provider.PCSD_SESSION, cookie)
         if sid:
-            self.assertEqual(cookie[webui.auth.PCSD_SESSION], sid)
-        return cookie[webui.auth.PCSD_SESSION]
+            self.assertEqual(cookie[webui.auth_provider.PCSD_SESSION], sid)
+        return cookie[webui.auth_provider.PCSD_SESSION]
 
     def test_deal_without_authentication(self):
         self.assert_unauth_ajax(self.get("/some-ajax", is_ajax=True))

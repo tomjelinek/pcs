@@ -1,3 +1,5 @@
+from typing import Optional
+
 from tornado.web import StaticFileHandler
 
 from pcs.daemon.app.common import EnhanceHeadersMixin
@@ -5,9 +7,10 @@ from pcs.daemon.app.common import EnhanceHeadersMixin
 
 class AjaxMixin:
     @property
-    def is_ajax(self):
+    def is_ajax(self) -> bool:
+        request = self.request  # type: ignore[attr-defined]
         return (
-            self.request.headers.get("X-Requested-With", default=None)
+            request.headers.get("X-Requested-With", default=None)
             == "XMLHttpRequest"
         )
 
@@ -17,7 +20,9 @@ class StaticFile(EnhanceHeadersMixin, StaticFileHandler):
     # method should be implemented to handle streamed request data.
     # BUT static files are not streamed SO:
     # pylint: disable=abstract-method
-    def initialize(self, path, default_filename=None):
+    def initialize(
+        self, path: str, default_filename: Optional[str] = None
+    ) -> None:
         super().initialize(path, default_filename)
         # allow static files to be cached
         self.clear_header_cache_control()

@@ -1,25 +1,21 @@
-"""
-This module reimplements the AuthProviders from pcs.daemon.app.auth module.
-
-This new approach tries to simplify the auth provider structure, and use
-composition over inheritance:
-    - Each auth provider should only use one method for auth
-    - AuthProviderMulti should be used when multiple auth methods are needed
-"""
-
 import pwd
 import socket
 import struct
+from logging import Logger
 from typing import Optional, Sequence, cast
 
 from tornado.http1connection import HTTP1Connection
 from tornado.ioloop import IOLoop
 from tornado.web import RequestHandler
 
-from pcs.daemon.app.auth import NotAuthorizedException
+from pcs.daemon import log
 from pcs.lib.auth.const import SUPERUSER
 from pcs.lib.auth.provider import AuthProvider
 from pcs.lib.auth.types import AuthUser
+
+
+class NotAuthorizedException(Exception):
+    pass
 
 
 class ApiAuthProviderInterface:
@@ -82,11 +78,14 @@ class AuthProviderMulti(ApiAuthProviderInterface):
     was previously embedded within individual providers.
     """
 
-    def __init__(self, providers: Sequence[ApiAuthProviderInterface]) -> None:
+    def __init__(
+        self, providers: Sequence[ApiAuthProviderInterface], logger: Logger
+    ) -> None:
         self._providers = providers
         self._first_available_provider: Optional[ApiAuthProviderInterface] = (
             None
         )
+        self._logger = logger
 
     def can_handle_request(self) -> bool:
         """
@@ -103,6 +102,9 @@ class AuthProviderMulti(ApiAuthProviderInterface):
 
     async def auth_user(self) -> AuthUser:
         if not self.can_handle_request():
+            self._logger.debug(
+                "Credentials not provided for any of the authentication methods"
+            )
             raise NotAuthorizedException()
         # can_handle_request returned true, so the _first_available_provider
         # cannot be None
@@ -119,7 +121,7 @@ class AuthProviderMultiFactory(ApiAuthProviderFactoryInterface):
 
     def create(self, handler: RequestHandler) -> ApiAuthProviderInterface:
         return AuthProviderMulti(
-            [factory.create(handler) for factory in self._factories]
+            [factory.create(handler) for factory in self._factories], log.pcsd
         )
 
 
@@ -136,10 +138,14 @@ class UnixSocketAuthProvider(ApiAuthProviderInterface):
     """
 
     def __init__(
-        self, handler: RequestHandler, lib_auth_provider: AuthProvider
+        self,
+        handler: RequestHandler,
+        lib_auth_provider: AuthProvider,
+        logger: Logger,
     ) -> None:
         self._handler = handler
         self._lib_auth_provider = lib_auth_provider
+        self._logger = logger
 
     def _is_unix_socket_used(self) -> bool:
         """
@@ -195,15 +201,22 @@ class UnixSocketAuthProvider(ApiAuthProviderInterface):
         return self._is_unix_socket_used()
 
     async def auth_user(self) -> AuthUser:
+        self._logger.debug("Attempting authentication via unix socket")
         username = self._get_unix_socket_user()
-        if username:
-            auth_user = await IOLoop.current().run_in_executor(
-                executor=None,
-                func=lambda: self._lib_auth_provider.login_user(username),
+        if not username:
+            self._logger.debug(
+                "Cannot authenticate using unix socket, unix socket was not "
+                "used to make the request"
             )
-            if auth_user:
-                return auth_user
-        raise NotAuthorizedException()
+            raise NotAuthorizedException()
+
+        auth_user = await IOLoop.current().run_in_executor(
+            executor=None,
+            func=lambda: self._lib_auth_provider.login_user(username),
+        )
+        if auth_user is None:
+            raise NotAuthorizedException()
+        return auth_user
 
 
 class UnixSocketAuthProviderFactory(ApiAuthProviderFactoryInterface):
@@ -211,15 +224,21 @@ class UnixSocketAuthProviderFactory(ApiAuthProviderFactoryInterface):
         self._lib_auth_provider = lib_auth_provider
 
     def create(self, handler: RequestHandler) -> UnixSocketAuthProvider:
-        return UnixSocketAuthProvider(handler, self._lib_auth_provider)
+        return UnixSocketAuthProvider(
+            handler, self._lib_auth_provider, log.pcsd
+        )
 
 
 class TokenAuthProvider(ApiAuthProviderInterface):
     def __init__(
-        self, handler: RequestHandler, lib_auth_provider: AuthProvider
+        self,
+        handler: RequestHandler,
+        lib_auth_provider: AuthProvider,
+        logger: Logger,
     ) -> None:
         self._handler = handler
         self._lib_auth_provider = lib_auth_provider
+        self._logger = logger
 
     @property
     def _token(self) -> Optional[str]:
@@ -229,7 +248,11 @@ class TokenAuthProvider(ApiAuthProviderInterface):
         return self._token is not None
 
     async def auth_user(self) -> AuthUser:
+        self._logger.debug("Attempting authentication via token")
         if not self.can_handle_request():
+            self._logger.debug(
+                "Credentials for authentication via token not provided"
+            )
             raise NotAuthorizedException()
 
         # tell mypy that token cannot be None here
@@ -249,4 +272,4 @@ class TokenAuthProviderFactory(ApiAuthProviderFactoryInterface):
         self._lib_auth_provider = lib_auth_provider
 
     def create(self, handler: RequestHandler) -> TokenAuthProvider:
-        return TokenAuthProvider(handler, self._lib_auth_provider)
+        return TokenAuthProvider(handler, self._lib_auth_provider, log.pcsd)

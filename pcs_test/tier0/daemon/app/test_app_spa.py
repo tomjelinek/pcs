@@ -2,6 +2,8 @@ import logging
 import os
 from unittest import mock
 
+from tornado.httputil import parse_cookie
+
 try:
     from pcs.daemon.app import webui
 except ImportError:
@@ -19,11 +21,14 @@ from pcs_test.tools.misc import (
     skip_unless_webui_installed,
 )
 
-LOGIN_BODY = {"username": fixtures_app.USER, "password": fixtures_app.PASSWORD}
 PREFIX = "/ui/"
 
 # Don't write errors to test output.
 logging.getLogger("tornado.access").setLevel(logging.CRITICAL)
+
+
+def login_body(username: str, password: str) -> dict[str, str]:
+    return {"username": username, "password": password}
 
 
 class AppTest(fixtures_app_webui.AppTest):
@@ -54,6 +59,16 @@ class AppTest(fixtures_app_webui.AppTest):
     def assert_success_response(self, response, expected_body):
         self.assertEqual(response.code, 200)
         self.assertEqual(response.body.decode(), expected_body)
+
+    def assert_sid_in_response(self, response):
+        self.assertTrue("Set-Cookie" in response.headers)
+        cookie = parse_cookie(response.headers["Set-Cookie"])
+        self.assertTrue(webui.auth_provider.PCSD_SESSION in cookie)
+        return cookie[webui.auth_provider.PCSD_SESSION]
+
+    def assert_sid_not_in_response(self, response):
+        cookie = parse_cookie(response.headers.get("Set-Cookie", ""))
+        self.assertFalse(webui.auth_provider.PCSD_SESSION in cookie)
 
 
 @skip_unless_webui_installed()
@@ -93,9 +108,15 @@ class Login(AppTest):
 
     def test_login_attempt_failed(self):
         self.auth_provider_mock.return_value = None
-        self.assert_unauth_ajax(
-            self.post(f"{PREFIX}login", LOGIN_BODY, is_ajax=True)
+
+        response = self.post(
+            f"{PREFIX}login",
+            login_body(fixtures_app.USER, fixtures_app.PASSWORD),
+            is_ajax=True,
         )
+
+        self.assert_unauth_ajax(response)
+        self.assert_sid_not_in_response(response)
         self.auth_provider_mock.assert_called_once_with(
             fixtures_app.USER, fixtures_app.PASSWORD
         )
@@ -104,10 +125,59 @@ class Login(AppTest):
         self.auth_provider_mock.return_value = AuthUser(
             fixtures_app.USER, fixtures_app.GROUPS
         )
-        response = self.post(f"{PREFIX}login", LOGIN_BODY, is_ajax=True)
+
+        response = self.post(
+            f"{PREFIX}login",
+            login_body(fixtures_app.USER, fixtures_app.PASSWORD),
+            is_ajax=True,
+        )
+
         self.assert_success_response(response, "")
+        self.assert_sid_in_response(response)
         self.auth_provider_mock.assert_called_once_with(
             fixtures_app.USER, fixtures_app.PASSWORD
+        )
+
+    def test_login_with_sid_same_user(self):
+        session1 = self.create_login_session()
+        self.auth_provider_mock.return_value = AuthUser(
+            fixtures_app.USER, fixtures_app.GROUPS
+        )
+
+        response = self.post(
+            f"{PREFIX}login",
+            login_body(fixtures_app.USER, fixtures_app.PASSWORD),
+            is_ajax=True,
+            sid=session1.sid,
+        )
+
+        self.assert_success_response(response, "")
+        response_sid = self.assert_sid_in_response(response)
+        self.assertEqual(session1.sid, response_sid)
+        self.auth_provider_mock.assert_called_once_with(
+            fixtures_app.USER, fixtures_app.PASSWORD
+        )
+
+    def test_login_with_sid_different_user(self):
+        # tests the case when login comes with sid, but the session belongs
+        # to different user than the one that is being logged in
+        session1 = self.create_login_session()
+        self.auth_provider_mock.return_value = AuthUser(
+            "different user", fixtures_app.GROUPS
+        )
+
+        response = self.post(
+            f"{PREFIX}login",
+            login_body("different user", fixtures_app.PASSWORD),
+            is_ajax=True,
+            sid=session1.sid,
+        )
+
+        self.assert_success_response(response, "")
+        response_sid = self.assert_sid_in_response(response)
+        self.assertNotEqual(session1.sid, response_sid)
+        self.auth_provider_mock.assert_called_once_with(
+            "different user", fixtures_app.PASSWORD
         )
 
 
@@ -117,4 +187,7 @@ class Logout(AppTest):
         session1 = self.create_login_session()
         response = self.get(f"{PREFIX}logout", sid=session1.sid, is_ajax=True)
         self.assert_success_response(response, "OK")
+        # check that the cookie is "cleared"
+        sid = self.assert_sid_in_response(response)
+        self.assertEqual(sid, "")
         self.assertIsNone(self.session_storage.get(session1.sid))

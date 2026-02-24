@@ -5,40 +5,16 @@ from unittest import mock
 from tornado.httpclient import HTTPResponse
 from tornado.web import Application
 
-from pcs.daemon.app.auth import NotAuthorizedException
-from pcs.daemon.app.auth_provider import ApiAuthProviderInterface
 from pcs.daemon.app.ui_manage import base_handler, get_routes
 from pcs.daemon.async_tasks.scheduler import Scheduler
-from pcs.lib.auth.types import AuthUser
 
-from pcs_test.tier0.daemon.app.fixtures_app_api import ApiTestBase
+from pcs_test.tier0.daemon.app.fixtures_app_api import (
+    ApiTestBase,
+    MockAuthProviderFactory,
+)
 
 # Don't write errors to test output.
 logging.getLogger("tornado.access").setLevel(logging.CRITICAL)
-
-
-class MockApiAuthProvider(ApiAuthProviderInterface):
-    def __init__(self):
-        self.available = True
-        self.user = AuthUser("testuser", ["testgroup"])
-        self.auth_successful = True
-
-    def can_handle_request(self) -> bool:
-        return self.available
-
-    async def auth_user(self) -> AuthUser:
-        if not self.auth_successful:
-            raise NotAuthorizedException()
-        return self.user
-
-
-class MockApiAuthProviderFactory:
-    def __init__(self):
-        self.provider = MockApiAuthProvider()
-
-    def create(self, handler) -> ApiAuthProviderInterface:
-        del handler
-        return self.provider
 
 
 class UiManageTest(ApiTestBase):
@@ -48,7 +24,7 @@ class UiManageTest(ApiTestBase):
 
     def setUp(self) -> None:
         self.scheduler = mock.AsyncMock(spec=Scheduler)
-        self.api_auth_provider_factory = MockApiAuthProviderFactory()
+        self.api_auth_provider_factory = MockAuthProviderFactory()
         self.api_auth_provider = self.api_auth_provider_factory.provider
         super().setUp()
 
@@ -130,18 +106,14 @@ class BaseAjaxProtectedManageHandlerTest(UiManageTest):
         response = self.fetch(self.url, add_ajax_header=False)
         self.assertEqual(response.code, 401)
         self.assert_body(response.body, '{"notauthorized":"true"}')
-
-    def test_prepare_requires_auth_provider_available(self):
-        self.api_auth_provider.available = False
-        response = self.fetch(self.url)
-        self.assertEqual(response.code, 401)
-        self.assert_body(response.body, '{"notauthorized":"true"}')
+        self.api_auth_provider_factory.provider.auth_user.assert_not_called()
 
     def test_process_request_auth_failure(self):
-        self.api_auth_provider.auth_successful = False
+        self.api_auth_provider_factory.auth_result = "not_authorized"
         response = self.fetch(self.url)
         self.assertEqual(response.code, 401)
         self.assert_body(response.body, '{"notauthorized":"true"}')
+        self.api_auth_provider_factory.provider.auth_user.assert_called_once_with()
 
 
 class UiManageHandlerTest(UiManageTest):
