@@ -89,6 +89,7 @@ class EnvConfig:
         wait=-1,
         exception=None,
         instead=None,
+        with_status=False,
         **modifier_shortcuts,
     ):
         """
@@ -115,7 +116,12 @@ class EnvConfig:
         )
         self.__calls.place(
             name,
-            PushCibCall(cib_xml, wait_timeout=wait, exception=exception),
+            PushCibCall(
+                cib_xml,
+                wait_timeout=wait,
+                exception=exception,
+                with_status=with_status,
+            ),
             instead=instead,
         )
 
