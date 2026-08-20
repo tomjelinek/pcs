@@ -1,0 +1,80 @@
+---
+# yamllint disable rule:line-length
+
+# ########################################################################
+# This workflow fast-forward updates the pcs-1.x branch to match main
+# on every push to main, using the GitHub API (no checkout required).
+#
+# It requires a fine-grained Personal Access Token (PAT) with
+# contents and workflows (read and write) permissions, stored as an environment
+# secret. The default GITHUB_TOKEN does not have sufficient permissions
+# to update branch refs via the API.
+#
+# Setup — create one environment and one secret in the GitHub UI:
+#
+#   1. Environment "mirror-token"
+#      - Create under Settings -> Environments -> New environment
+#      - Set the main branch under "Deployment branches and tags"
+#
+#   2. Environment secret "PCS_REPO_MIRROR_GITHUB_API_TOKEN"
+#      - Create a fine-grained PAT at:
+#        https://github.com/settings/personal-access-tokens/new
+#      - Set "Resource owner" to the repository owner user who can
+#        bypass configured branch protection rules
+#      - Under "Repository access", select "Only select repositories"
+#        and choose "ClusterLabs/pcs"
+#      - Under "Repository permissions", set "Contents" and "Workflows" to
+#        "Read and write"
+#      - Save the token and add it as an environment secret under
+#        Settings -> Environments -> mirror-token -> Add
+#        environment secret with the name
+#        PCS_REPO_MIRROR_GITHUB_API_TOKEN
+#
+# Documentation:
+# - https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments
+# - https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token
+# - https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens?apiVersion=2026-03-10#repository-permissions-for-contents
+# - https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens?apiVersion=2026-03-10#repository-permissions-for-workflows
+# - https://docs.github.com/en/rest/git/refs?apiVersion=2026-03-10#get-a-reference
+# - https://docs.github.com/en/rest/git/refs?apiVersion=2026-03-10#update-a-reference
+# ########################################################################
+
+name: API Branch Mirror
+# yamllint disable-line rule:truthy
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  TARGET_BRANCH: pcs-1.x
+
+jobs:
+  mirror:
+    environment: mirror-token
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fast-forward update ${{ env.TARGET_BRANCH }}
+        env:
+          GH_TOKEN: ${{ secrets.PCS_REPO_MIRROR_GITHUB_API_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          HTTP_CODE=$(
+            curl -s -o /tmp/mirror-response.json -w "%{http_code}" \
+              -X PATCH \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2026-03-10" \
+              "https://api.github.com/repos/${REPO}/git/refs/heads/${TARGET_BRANCH}" \
+              -d "{\"sha\": \"${SHA}\", \"force\": false}"
+          )
+          if [[ "$HTTP_CODE" != "200" ]]; then
+            echo "ERROR: Failed to update ${TARGET_BRANCH} (HTTP ${HTTP_CODE})"
+            cat /tmp/mirror-response.json
+            exit 1
+          fi
+          echo "Successfully fast-forwarded ${TARGET_BRANCH} to ${SHA}"
