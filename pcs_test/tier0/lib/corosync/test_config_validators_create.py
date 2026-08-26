@@ -1189,7 +1189,7 @@ class CreateLinkListKnet(CreateLinkListCommonMixin, TestCase):
                         "ping_precision": "15",
                         "ping_timeout": "750",
                         "pong_count": "10",
-                        "transport": "sctp",
+                        "transport": "udp",
                     },
                     {
                         "linknumber": "1",
@@ -1204,14 +1204,7 @@ class CreateLinkListKnet(CreateLinkListCommonMixin, TestCase):
                 ],
                 2,
             ),
-            [
-                fixture.deprecation(
-                    report_codes.DEPRECATED_OPTION_VALUE,
-                    option_name="transport",
-                    deprecated_value="sctp",
-                    replaced_by=None,
-                )
-            ],
+            [],
         )
 
     def test_invalid_all_values(self):
@@ -1263,7 +1256,7 @@ class CreateLinkListKnet(CreateLinkListCommonMixin, TestCase):
                     report_codes.INVALID_OPTION_VALUE,
                     option_value="tcp",
                     option_name="transport",
-                    allowed_values=("sctp", "udp"),
+                    allowed_values=("udp",),
                     cannot_be_empty=False,
                     forbidden_characters=None,
                 ),
@@ -1303,7 +1296,7 @@ class CreateLinkListKnet(CreateLinkListCommonMixin, TestCase):
                     report_codes.INVALID_OPTION_VALUE,
                     option_value="udpu",
                     option_name="transport",
-                    allowed_values=("sctp", "udp"),
+                    allowed_values=("udp",),
                     cannot_be_empty=False,
                     forbidden_characters=None,
                 ),
@@ -1505,7 +1498,7 @@ class CreateLinkListKnet(CreateLinkListCommonMixin, TestCase):
                         "ping_precision": "{}15",
                         "ping_timeout": "\r\n750",
                         "pong_count": "{10}",
-                        "transport": "\rsctp\n",
+                        "transport": "\rudp\n",
                         "op:.tion": "va}l{ue",
                     },
                 ],
@@ -1578,7 +1571,7 @@ class CreateLinkListKnet(CreateLinkListCommonMixin, TestCase):
                 ),
                 fixture.error(
                     report_codes.INVALID_OPTION_VALUE,
-                    option_value="\rsctp\n",
+                    option_value="\rudp\n",
                     option_name="transport",
                     **forbidden_characters_kwargs,
                 ),
@@ -1638,9 +1631,9 @@ class CreateLinkListKnet(CreateLinkListCommonMixin, TestCase):
                 ),
                 fixture.error(
                     report_codes.INVALID_OPTION_VALUE,
-                    option_value="\rsctp\n",
+                    option_value="\rudp\n",
                     option_name="transport",
-                    allowed_values=("sctp", "udp"),
+                    allowed_values=("udp",),
                     cannot_be_empty=False,
                     forbidden_characters=None,
                 ),

@@ -555,7 +555,7 @@ class AddLink(TestCase):
                     report_codes.INVALID_OPTION_VALUE,
                     option_name="transport",
                     option_value="t",
-                    allowed_values=("sctp", "udp"),
+                    allowed_values=("udp",),
                     cannot_be_empty=False,
                     forbidden_characters=None,
                 ),
@@ -749,7 +749,7 @@ class AddLink(TestCase):
                     report_codes.INVALID_OPTION_VALUE,
                     option_value="udp}",
                     option_name="transport",
-                    allowed_values=("sctp", "udp"),
+                    allowed_values=("udp",),
                     cannot_be_empty=False,
                     forbidden_characters=None,
                 ),
@@ -761,29 +761,6 @@ class AddLink(TestCase):
                     cannot_be_empty=False,
                     forbidden_characters=None,
                 ),
-            ],
-        )
-
-    def test_deprecated_sctp_knet_transport(self):
-        assert_report_item_list_equal(
-            config_validators.add_link(
-                self.new_addrs,
-                {
-                    "transport": "sctp",
-                },
-                self.coro_nodes,
-                self.pcmk_nodes,
-                self.existing_link_list,
-                self.transport,
-                constants.IP_VERSION_64,
-            ),
-            [
-                fixture.deprecation(
-                    report_codes.DEPRECATED_OPTION_VALUE,
-                    option_name="transport",
-                    deprecated_value="sctp",
-                    replaced_by=None,
-                )
             ],
         )
 
@@ -1524,7 +1501,7 @@ class UpdateLinkKnet(TestCase):
                     report_codes.INVALID_OPTION_VALUE,
                     option_name="transport",
                     option_value="t",
-                    allowed_values=("sctp", "udp"),
+                    allowed_values=("udp",),
                     cannot_be_empty=False,
                     forbidden_characters=None,
                 ),
@@ -1846,36 +1823,9 @@ class UpdateLinkKnet(TestCase):
                     report_codes.INVALID_OPTION_VALUE,
                     option_value="udp}",
                     option_name="transport",
-                    allowed_values=("sctp", "udp"),
+                    allowed_values=("udp",),
                     cannot_be_empty=False,
                     forbidden_characters=None,
-                ),
-            ],
-        )
-
-    def test_deprecated_sctp_knet_transport(self):
-        assert_report_item_list_equal(
-            config_validators.update_link(
-                "2",
-                {},
-                {
-                    "transport": "sctp",
-                },
-                {},
-                [],
-                [],
-                [
-                    "2",
-                ],
-                constants.TRANSPORTS_KNET[0],
-                constants.IP_VERSION_64,
-            ),
-            [
-                fixture.deprecation(
-                    report_codes.DEPRECATED_OPTION_VALUE,
-                    option_name="transport",
-                    deprecated_value="sctp",
-                    replaced_by=None,
                 ),
             ],
         )

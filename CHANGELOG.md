@@ -13,6 +13,8 @@
   sync-certificates`
 - Automatic synchronization of pcsd SSL certificates during `pcs cluster setup`
   and `pcs cluster node add`
+- Value `sctp` of the knet link option `transport`, following corosync / knet
+  (TODO rhel jira link)
 
 ### Fixed
 - Command `pcs stonith update-scsi-devices` no longer triggers unnecessary

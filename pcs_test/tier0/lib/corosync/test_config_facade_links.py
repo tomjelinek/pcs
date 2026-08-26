@@ -83,7 +83,7 @@ class GetLinkOptions(TestCase):
                         knet_ping_precision: 4
                         knet_ping_timeout: 5
                         knet_pong_count: 6
-                        knet_transport: sctp
+                        knet_transport: udp
                         unknown: option
                     }
                 }
@@ -98,7 +98,7 @@ class GetLinkOptions(TestCase):
                     "ping_precision": "4",
                     "ping_timeout": "5",
                     "pong_count": "6",
-                    "transport": "sctp",
+                    "transport": "udp",
                 },
             },
         )
@@ -284,7 +284,7 @@ class AddLink(TestCase):
                 "ping_precision": "10",
                 "ping_timeout": "20",
                 "pong_count": "5",
-                "transport": "sctp",
+                "transport": "udp",
             },
             self.before,
             dedent(
@@ -303,7 +303,7 @@ class AddLink(TestCase):
                         knet_ping_precision: 10
                         knet_ping_timeout: 20
                         knet_pong_count: 5
-                        knet_transport: sctp
+                        knet_transport: udp
                         linknumber: 2
                         mcastport: 5405
                     }
@@ -370,7 +370,7 @@ class AddLink(TestCase):
     def test_custom_link_number_options(self):
         self._assert_add(
             {"node1": "node1-addr2", "node2": "node2-addr2"},
-            {"linknumber": "4", "transport": "sctp"},
+            {"linknumber": "4", "transport": "udp"},
             self.before,
             dedent(
                 """\
@@ -383,7 +383,7 @@ class AddLink(TestCase):
                     }
 
                     interface {
-                        knet_transport: sctp
+                        knet_transport: udp
                         linknumber: 4
                     }
                 }
@@ -449,7 +449,7 @@ class AddLink(TestCase):
                 }
 
                 interface {
-                    knet_transport: sctp
+                    knet_transport: udp
                     linknumber: 0
                 }
             }
@@ -475,7 +475,7 @@ class AddLink(TestCase):
         )
         self._assert_add(
             {"node1": "node1-addr0", "node2": "node2-addr0"},
-            {"transport": "sctp"},
+            {"transport": "udp"},
             before,
             after,
         )
@@ -623,7 +623,7 @@ class AddLink(TestCase):
         )
         self._assert_add(
             {"node1": "node1-addr4", "node2": "node2-addr4"},
-            {"linknumber": "4", "transport": "sctp"},
+            {"linknumber": "4", "transport": "udp"},
             before,
             dedent(
                 """\
@@ -638,7 +638,7 @@ class AddLink(TestCase):
                     transport: knet
 
                     interface {
-                        knet_transport: sctp
+                        knet_transport: udp
                         linknumber: 4
                     }
                 }
@@ -685,7 +685,7 @@ class RemoveLinks(TestCase):
 
                 interface {
                     linknumber: 2
-                    knet_transport: sctp
+                    knet_transport: udp
                 }
             }
 
@@ -910,7 +910,7 @@ class RemoveLinks(TestCase):
 
                 interface {
                     linknumber: 2
-                    knet_transport: sctp
+                    knet_transport: udp
                 }
 
                 interface {
@@ -964,7 +964,7 @@ class RemoveLinks(TestCase):
             totem {
                 interface {
                     linknumber: 2
-                    knet_transport: sctp
+                    knet_transport: udp
                 }
             }
 
@@ -1011,7 +1011,7 @@ class RemoveLinks(TestCase):
 
                 interface {
                     linknumber: 1
-                    knet_transport: sctp
+                    knet_transport: udp
                 }
             }
 
@@ -1037,7 +1037,7 @@ class RemoveLinks(TestCase):
             totem {
                 interface {
                     linknumber: 1
-                    knet_transport: sctp
+                    knet_transport: udp
                 }
             }
 
@@ -1194,7 +1194,7 @@ class UpdateLink(TestCase):
 
                 interface {
                     linknumber: 2
-                    knet_transport: sctp
+                    knet_transport: udp
                 }
             }
 
@@ -1217,7 +1217,7 @@ class UpdateLink(TestCase):
         """
         )
         self._assert_update(
-            before, after, "2", {"transport": "sctp"}, {"node1": "new-addr"}
+            before, after, "2", {"transport": "udp"}, {"node1": "new-addr"}
         )
 
     def test_do_not_allow_linknumber_change(self):
@@ -1256,7 +1256,7 @@ class UpdateLink(TestCase):
 
                 interface {
                     linknumber: 1
-                    knet_transport: sctp
+                    knet_transport: udp
                 }
             }
 
@@ -1281,7 +1281,7 @@ class UpdateLink(TestCase):
             before,
             after,
             "1",
-            {"linknumber": "2", "transport": "sctp"},
+            {"linknumber": "2", "transport": "udp"},
             {"node1": "new-addr"},
         )
 
@@ -1410,7 +1410,7 @@ class UpdateLink(TestCase):
 
                 interface {
                     linknumber: 0
-                    knet_transport: sctp
+                    knet_transport: udp
                 }
 
                 interface {
@@ -1428,12 +1428,12 @@ class UpdateLink(TestCase):
 
                 interface {
                     linknumber: 0
-                    knet_transport: sctp
+                    knet_transport: udp
                 }
 
                 interface {
                     linknumber: 1
-                    knet_transport: sctp
+                    knet_transport: udp
                     knet_pong_count: 10
                 }
             }
@@ -1443,7 +1443,7 @@ class UpdateLink(TestCase):
             before,
             after,
             "1",
-            {"transport": "sctp", "mcastport": "", "pong_count": "10"},
+            {"transport": "udp", "mcastport": "", "pong_count": "10"},
             {},
         )
 
@@ -1461,7 +1461,7 @@ class UpdateLink(TestCase):
 
                 interface {
                     linknumber: 0
-                    knet_transport: sctp
+                    knet_transport: udp
                 }
 
                 interface {
@@ -1490,7 +1490,7 @@ class UpdateLink(TestCase):
 
                 interface {
                     linknumber: 0
-                    knet_transport: sctp
+                    knet_transport: udp
                 }
             }
 
@@ -1561,12 +1561,12 @@ class UpdateLink(TestCase):
 
                 interface {
                     linknumber: 1
-                    knet_transport: sctp
+                    knet_transport: udp
                 }
             }
         """
         )
-        self._assert_update(before, after, "1", {"transport": "sctp"}, {})
+        self._assert_update(before, after, "1", {"transport": "udp"}, {})
 
     def test_enable_broadcast(self):
         before = dedent(

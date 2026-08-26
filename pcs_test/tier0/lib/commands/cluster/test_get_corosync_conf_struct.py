@@ -161,9 +161,9 @@ class GetCorosyncConfStruct(TestCase):
                     interface {
                         linknumber: 1
                         knet_link_priority: 200
-                        knet_ping_interval: 750
-                        knet_ping_timeout: 1500
-                        knet_transport: sctp
+                        knet_ping_interval: 751
+                        knet_ping_timeout: 1502
+                        knet_transport: udp
                     }
                 }
 
@@ -276,9 +276,9 @@ class GetCorosyncConfStruct(TestCase):
                     "1": {
                         "linknumber": "1",
                         "link_priority": "200",
-                        "ping_interval": "750",
-                        "ping_timeout": "1500",
-                        "transport": "sctp",
+                        "ping_interval": "751",
+                        "ping_timeout": "1502",
+                        "transport": "udp",
                     },
                 },
                 quorum_options={"wait_for_all": "1"},

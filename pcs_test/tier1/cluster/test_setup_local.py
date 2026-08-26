@@ -162,7 +162,6 @@ class SetupLocal(AssertPcsMixin, TestCase):
                 "transport knet ip_version=ipv4 link_mode=passive "
                 "link linknumber=2 link_priority=100 mcastport=12345 "
                 "ping_interval=201 ping_precision=2 ping_timeout=203 pong_count=4 "
-                "transport=sctp "
                 "link linknumber=1 transport=udp "
                 "compression level=2 model=zlib threshold=10 "
                 "crypto cipher=aes256 hash=sha512 model=openssl "
@@ -170,11 +169,6 @@ class SetupLocal(AssertPcsMixin, TestCase):
                 "quorum last_man_standing=1 last_man_standing_window=10 "
                 "--overwrite --no-cluster-uuid"
             ).split(),
-            stderr_full=(
-                "Deprecation Warning: Value 'sctp' of option transport is "
-                "deprecated and might be removed in a future release, "
-                "therefore it should not be used\n"
-            ),
         )
         self.assertEqual(
             self.corosync_conf_file.read(),
@@ -207,7 +201,6 @@ class SetupLocal(AssertPcsMixin, TestCase):
                         knet_ping_precision: 2
                         knet_ping_timeout: 203
                         knet_pong_count: 4
-                        knet_transport: sctp
                         linknumber: 2
                         mcastport: 12345
                     }
@@ -283,7 +276,7 @@ class SetupLocal(AssertPcsMixin, TestCase):
                 Deprecation Warning: Disabling cluster traffic encryption is deprecated and will not be possible in a future version
                 Error: invalid link option 'pong__count', allowed options are: 'link_priority', 'linknumber', 'mcastport', 'ping_interval', 'ping_precision', 'ping_timeout', 'pong_count', 'transport'
                 Error: '123450' is not a valid mcastport value, use a port number (1..65535)
-                Deprecation Warning: Value 'sctp' of option transport is deprecated and might be removed in a future release, therefore it should not be used
+                Error: 'sctp' is not a valid transport value, use 'udp'
                 Error: Cannot set options for non-existent link '3', existing links: '0', '1', '2'
                 Error: invalid quorum option 'lst_man_standing', allowed options are: 'auto_tie_breaker', 'last_man_standing', 'last_man_standing_window', 'wait_for_all'
                 Error: If quorum option 'last_man_standing_window' is enabled, quorum option 'last_man_standing' must be enabled as well

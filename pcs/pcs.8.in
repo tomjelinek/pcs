@@ -480,7 +480,7 @@ This is the default transport. It allows configuring traffic encryption and comp
 .br
 Transport options are: ip_version, knet_pmtud_interval, link_mode
 .br
-Link options are: link_priority, linknumber, mcastport, ping_interval, ping_precision, ping_timeout, pong_count, transport (udp or sctp)
+Link options are: link_priority, linknumber, mcastport, ping_interval, ping_precision, ping_timeout, pong_count, transport
 .br
 Each 'link' followed by options sets options for one link in the order the links are defined by nodes' addresses. You can set link options for a subset of links using a linknumber. See examples below.
 .br
@@ -530,11 +530,11 @@ Create a cluster with default settings:
 Create a cluster using two links:
     pcs cluster setup newcluster node1 addr=10.0.1.11 addr=10.0.2.11 node2 addr=10.0.1.12 addr=10.0.2.12
 .br
-Set link options for all links. Link options are matched to the links in order. The first link (link 0) has sctp transport, the second link (link 1) has mcastport 55405:
-    pcs cluster setup newcluster node1 addr=10.0.1.11 addr=10.0.2.11 node2 addr=10.0.1.12 addr=10.0.2.12 transport knet link transport=sctp link mcastport=55405
+Set link options for all links. Link options are matched to the links in order. The first link (link 0) has pong_count 4, the second link (link 1) has mcastport 55405:
+    pcs cluster setup newcluster node1 addr=10.0.1.11 addr=10.0.2.11 node2 addr=10.0.1.12 addr=10.0.2.12 transport knet link pong_count=4 link mcastport=55405
 .br
 Set link options for the second and fourth links only. Link options are matched to the links based on the linknumber option (the first link is link 0):
-    pcs cluster setup newcluster node1 addr=10.0.1.11 addr=10.0.2.11 addr=10.0.3.11 addr=10.0.4.11 node2 addr=10.0.1.12 addr=10.0.2.12 addr=10.0.3.12 addr=10.0.4.12 transport knet link linknumber=3 mcastport=55405 link linknumber=1 transport=sctp
+    pcs cluster setup newcluster node1 addr=10.0.1.11 addr=10.0.2.11 addr=10.0.3.11 addr=10.0.4.11 node2 addr=10.0.1.12 addr=10.0.2.12 addr=10.0.3.12 addr=10.0.4.12 transport knet link linknumber=3 mcastport=55405 link linknumber=1 pong_count=4
 .br
 Create a cluster using udp transport with a non\-default port:
     pcs cluster setup newcluster node1 node2 transport udp link mcastport=55405
@@ -738,7 +738,7 @@ optionally, you can deauthenticate old node names.
 link add <node_name>=<node_address>... [options <link options>]
 Add a corosync link. One address must be specified for each cluster node. If no linknumber is specified, pcs will use the lowest available linknumber.
 .br
-Link options (documented in corosync.conf(5) man page) are: link_priority, linknumber, mcastport, ping_interval, ping_precision, ping_timeout, pong_count, transport (udp or sctp)
+Link options (documented in corosync.conf(5) man page) are: link_priority, linknumber, mcastport, ping_interval, ping_precision, ping_timeout, pong_count, transport
 .TP
 link delete <linknumber> [<linknumber>]...
 Remove specified corosync links.
@@ -751,7 +751,7 @@ Add, remove or change node addresses / link options of an existing corosync link
 .br
 Link options (documented in corosync.conf(5) man page) are:
 .br
-for knet transport: link_priority, mcastport, ping_interval, ping_precision, ping_timeout, pong_count, transport (udp or sctp)
+for knet transport: link_priority, mcastport, ping_interval, ping_precision, ping_timeout, pong_count, transport
 .br
 for udp and udpu transports: bindnetaddr, broadcast, mcastaddr, mcastport, ttl
 .TP
@@ -1730,6 +1730,11 @@ no_proxy, https_proxy, all_proxy, NO_PROXY, HTTPS_PROXY, ALL_PROXY
  These environment variables (listed according to their priorities) control how pcs handles proxy servers when connecting to cluster nodes. See curl(1) man page for details.
 .SH CHANGES IN PCS\-1.0
 This section summarizes the most important changes in commands done in pcs\-1.0.x compared to pcs\-0.12.x. For detailed description of current commands see above.
+.SS "Corosync / kronosnet changes"
+.TP
+Following Corosync / Kronosnet, pcs has dropped support for:
+.br
+SCTP transport in knet links
 .SS "\-\-force no longer accepted as an alternative to \-\-yes or \-\-overwrite"
 The \fB\-\-force\fR flag is no longer accepted as an alternative to interactive confirmation or file overwriting in the following commands. Use \fB\-\-yes\fR or \fB\-\-overwrite\fR instead. Affected commands are: 'pcs cluster destroy', 'pcs quorum unblock', 'pcs stonith confirm', 'pcs stonith sbd device setup', 'pcs stonith sbd watchdog test' (\fB\-\-yes\fR) and 'pcs cluster report' (\fB\-\-overwrite\fR).
 .SS "pcsd"

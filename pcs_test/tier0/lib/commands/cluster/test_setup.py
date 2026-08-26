@@ -1864,7 +1864,7 @@ class TransportKnetSuccess(TestCase):
                 ping_precision="2",
                 ping_timeout="203",
                 pong_count="4",
-                transport="sctp",
+                transport="udp",
             ),
             dict(mcastport="23456"),
             dict(
@@ -1876,7 +1876,7 @@ class TransportKnetSuccess(TestCase):
                 link_priority="20",
             ),
             dict(mcastport="34567"),
-            dict(transport="sctp"),
+            dict(transport="udp"),
         ]
         links_linknumber = [1, 0, 7, 3, 2, 4]
         transport_options = dict(
@@ -1926,21 +1926,7 @@ class TransportKnetSuccess(TestCase):
             quorum_options=QUORUM_OPTIONS,
         )
         self.env_assist.assert_reports(
-            [
-                fixture.deprecation(
-                    reports.codes.DEPRECATED_OPTION_VALUE,
-                    option_name="transport",
-                    deprecated_value="sctp",
-                    replaced_by=None,
-                ),
-                fixture.deprecation(
-                    reports.codes.DEPRECATED_OPTION_VALUE,
-                    option_name="transport",
-                    deprecated_value="sctp",
-                    replaced_by=None,
-                ),
-            ]
-            + reports_success_minimal_fixture(using_known_hosts_addresses=False)
+            reports_success_minimal_fixture(using_known_hosts_addresses=False)
         )
 
     def test_disable_crypto(self):
