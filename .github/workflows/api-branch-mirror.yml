@@ -3,7 +3,8 @@
 
 # ########################################################################
 # This workflow fast-forward updates the pcs-1.x branch to match main
-# on every push to main, using the GitHub API (no checkout required).
+# on a daily schedule (or on manual dispatch), using the GitHub API
+# (no checkout required).
 #
 # It requires a fine-grained Personal Access Token (PAT) with
 # contents and workflows (read and write) permissions, stored as an environment
@@ -42,27 +43,57 @@
 name: API Branch Mirror
 # yamllint disable-line rule:truthy
 on:
-  push:
-    branches:
-      - main
+  # Trigger every day at 3am (UTC).
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      source_branch:
+        description: "Source branch to mirror from (default: main)"
+        type: string
+        default: ""
+      target_branch:
+        description: "Target branch to update (default: pcs-1.x)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
 env:
-  TARGET_BRANCH: pcs-1.x
+  DEFAULT_SOURCE_BRANCH: main
+  DEFAULT_TARGET_BRANCH: pcs-1.x
 
 jobs:
   mirror:
     environment: mirror-token
     runs-on: ubuntu-latest
     steps:
-      - name: Fast-forward update ${{ env.TARGET_BRANCH }}
+      - name: Fast-forward update ${{ env.DEFAULT_TARGET_BRANCH }}
         env:
           GH_TOKEN: ${{ secrets.PCS_REPO_MIRROR_GITHUB_API_TOKEN }}
           REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
+          INPUT_SOURCE_BRANCH: ${{ github.event.inputs.source_branch }}
+          INPUT_TARGET_BRANCH: ${{ github.event.inputs.target_branch }}
         run: |
+          SOURCE_BRANCH="${INPUT_SOURCE_BRANCH:-$DEFAULT_SOURCE_BRANCH}"
+          TARGET_BRANCH="${INPUT_TARGET_BRANCH:-$DEFAULT_TARGET_BRANCH}"
+
+          # Always resolve the tip of the source branch via the API so the
+          # mirror source is authoritative for every trigger (schedule and
+          # manual dispatch).
+          SHA=$(
+            curl -s \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2026-03-10" \
+              "https://api.github.com/repos/${REPO}/git/refs/heads/${SOURCE_BRANCH}" \
+              | jq -r '.object.sha'
+          )
+          if [[ -z "${SHA}" || "${SHA}" == "null" ]]; then
+            echo "ERROR: Failed to resolve SHA for source branch ${SOURCE_BRANCH}"
+            exit 1
+          fi
           HTTP_CODE=$(
             curl -s -o /tmp/mirror-response.json -w "%{http_code}" \
               -X PATCH \
