@@ -2195,13 +2195,13 @@ class TransportKnetSuccess(TestCase):
                     reports.codes.DEPRECATED_OPTION_VALUE,
                     option_name="transport",
                     deprecated_value="sctp",
-                    replaced_by=None,
+                    replaced_by="udp",
                 ),
                 fixture.deprecation(
                     reports.codes.DEPRECATED_OPTION_VALUE,
                     option_name="transport",
                     deprecated_value="sctp",
-                    replaced_by=None,
+                    replaced_by="udp",
                 ),
             ]
             + reports_success_minimal_fixture(using_known_hosts_addresses=False)

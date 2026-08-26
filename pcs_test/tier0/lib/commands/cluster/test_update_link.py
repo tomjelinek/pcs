@@ -324,7 +324,7 @@ class UpdateLinkKnet(TestCase):
                     report_codes.DEPRECATED_OPTION_VALUE,
                     option_name="transport",
                     deprecated_value="sctp",
-                    replaced_by=None,
+                    replaced_by="udp",
                 )
             ]
         )

@@ -173,7 +173,7 @@ class SetupLocal(AssertPcsMixin, TestCase):
             stderr_full=(
                 "Deprecation Warning: Value 'sctp' of option transport is "
                 "deprecated and might be removed in a future release, "
-                "therefore it should not be used\n"
+                "therefore it should not be used, use 'udp' value instead\n"
             ),
         )
         self.assertEqual(
@@ -283,7 +283,7 @@ class SetupLocal(AssertPcsMixin, TestCase):
                 Deprecation Warning: Disabling cluster traffic encryption is deprecated and will not be possible in a future version
                 Error: invalid link option 'pong__count', allowed options are: 'link_priority', 'linknumber', 'mcastport', 'ping_interval', 'ping_precision', 'ping_timeout', 'pong_count', 'transport'
                 Error: '123450' is not a valid mcastport value, use a port number (1..65535)
-                Deprecation Warning: Value 'sctp' of option transport is deprecated and might be removed in a future release, therefore it should not be used
+                Deprecation Warning: Value 'sctp' of option transport is deprecated and might be removed in a future release, therefore it should not be used, use 'udp' value instead
                 Error: Cannot set options for non-existent link '3', existing links: '0', '1', '2'
                 Error: invalid quorum option 'lst_man_standing', allowed options are: 'auto_tie_breaker', 'last_man_standing', 'last_man_standing_window', 'wait_for_all'
                 Error: If quorum option 'last_man_standing_window' is enabled, quorum option 'last_man_standing' must be enabled as well
