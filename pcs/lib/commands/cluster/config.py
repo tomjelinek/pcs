@@ -38,10 +38,7 @@ def _config_update(
     report_list = config_validators.update_totem(totem_options)
     if transport_type in corosync_constants.TRANSPORTS_KNET:
         report_list += config_validators.update_transport_knet(
-            transport_options,
-            compression_options,
-            crypto_options,
-            corosync_conf.get_crypto_options(),
+            transport_options, compression_options, crypto_options
         )
     elif transport_type in corosync_constants.TRANSPORTS_UDP:
         report_list += config_validators.update_transport_udp(

@@ -273,7 +273,6 @@ class SetupLocal(AssertPcsMixin, TestCase):
                 """\
                 Error: Unable to resolve addresses: '127.0.1.1.2', use --force to override
                 Error: All nodes must have the same number of addresses; nodes 'node1', 'node3' have 3 addresses; node 'node2' has 2 addresses
-                Deprecation Warning: Disabling cluster traffic encryption is deprecated and will not be possible in a future version
                 Error: invalid link option 'pong__count', allowed options are: 'link_priority', 'linknumber', 'mcastport', 'ping_interval', 'ping_precision', 'ping_timeout', 'pong_count', 'transport'
                 Error: '123450' is not a valid mcastport value, use a port number (1..65535)
                 Error: 'sctp' is not a valid transport value, use 'udp'

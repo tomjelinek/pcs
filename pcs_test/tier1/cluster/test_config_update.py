@@ -183,10 +183,8 @@ class UpdateLocal(AssertPcsMixin, TestCase):
                 "'ipv4-6', 'ipv6', 'ipv6-4'\n"
                 "Error: 'NaN' is not a valid threshold value, use a "
                 "non-negative integer\n"
-                "Error: If crypto option 'cipher' is enabled, crypto option "
-                "'hash' must be enabled as well\n"
-                "Deprecation Warning: Disabling cluster traffic encryption is "
-                "deprecated and will not be possible in a future version\n"
+                "Error: '' is not a valid hash value, use 'md5', 'sha1', "
+                "'sha256', 'sha384', 'sha512'\n"
                 "Error: Errors have occurred, therefore pcs is unable to "
                 "continue\n"
             ),
