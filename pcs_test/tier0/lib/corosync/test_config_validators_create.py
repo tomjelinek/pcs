@@ -22,6 +22,13 @@ _FIXTURE_KNET_PING_INTERVAL_TIMEOUT_EXPECTED = (
     "an integer greater than or equal to 200"
 )
 
+_FIXTURE_REPORT_UDP_DEPRECATED = fixture.deprecation(
+    report_codes.DEPRECATED_OPTION_VALUE,
+    option_name="transport",
+    deprecated_value="udp",
+    replaced_by="knet",
+)
+
 
 class Create(TestCase):
     def setUp(self):
@@ -42,7 +49,7 @@ class Create(TestCase):
                 "udp",
                 "ipv4",
             ),
-            [],
+            [_FIXTURE_REPORT_UDP_DEPRECATED],
         )
 
     def test_all_valid_udp(self):
@@ -56,7 +63,7 @@ class Create(TestCase):
                 "udp",
                 "ipv4",
             ),
-            [],
+            [_FIXTURE_REPORT_UDP_DEPRECATED],
         )
 
     def test_all_valid_knet(self):
@@ -121,6 +128,7 @@ class Create(TestCase):
                 "ipv4",
             ),
             [
+                _FIXTURE_REPORT_UDP_DEPRECATED,
                 fixture.error(
                     report_codes.COROSYNC_CLUSTER_NAME_INVALID_FOR_GFS2,
                     force_code=report_codes.FORCE,
@@ -142,6 +150,7 @@ class Create(TestCase):
                 "ipv4",
             ),
             [
+                _FIXTURE_REPORT_UDP_DEPRECATED,
                 fixture.error(
                     report_codes.COROSYNC_CLUSTER_NAME_INVALID_FOR_GFS2,
                     force_code=report_codes.FORCE,
@@ -165,6 +174,7 @@ class Create(TestCase):
                 force_cluster_name=True,
             ),
             [
+                _FIXTURE_REPORT_UDP_DEPRECATED,
                 fixture.warn(
                     report_codes.COROSYNC_CLUSTER_NAME_INVALID_FOR_GFS2,
                     cluster_name=cluster_name,
@@ -177,7 +187,10 @@ class Create(TestCase):
     def test_nodelist_empty(self):
         assert_report_item_list_equal(
             config_validators.create("test-cluster", [], "udp", "ipv4"),
-            [fixture.error(report_codes.COROSYNC_NODES_MISSING)],
+            [
+                _FIXTURE_REPORT_UDP_DEPRECATED,
+                fixture.error(report_codes.COROSYNC_NODES_MISSING),
+            ],
         )
 
     def test_empty_node(self):
@@ -192,6 +205,7 @@ class Create(TestCase):
                 "ipv4",
             ),
             [
+                _FIXTURE_REPORT_UDP_DEPRECATED,
                 fixture.error(
                     report_codes.REQUIRED_OPTIONS_ARE_MISSING,
                     option_names=["name"],
@@ -220,6 +234,7 @@ class Create(TestCase):
                 "ipv4",
             ),
             [
+                _FIXTURE_REPORT_UDP_DEPRECATED,
                 fixture.error(
                     report_codes.INVALID_OPTIONS,
                     option_names=["nonsense"],
@@ -242,6 +257,7 @@ class Create(TestCase):
                 "ipv4",
             ),
             [
+                _FIXTURE_REPORT_UDP_DEPRECATED,
                 fixture.error(
                     report_codes.INVALID_OPTION_VALUE,
                     option_value="",
@@ -276,6 +292,7 @@ class Create(TestCase):
                 "ipv4",
             ),
             [
+                _FIXTURE_REPORT_UDP_DEPRECATED,
                 fixture.error(
                     report_codes.INVALID_OPTION_VALUE,
                     option_value="",
@@ -311,7 +328,8 @@ class Create(TestCase):
                 "udp",
                 "ipv4",
             ),
-            [
+            [_FIXTURE_REPORT_UDP_DEPRECATED]
+            + [
                 fixture.error(
                     report_codes.COROSYNC_BAD_NODE_ADDRESSES_COUNT,
                     actual_count=0,
@@ -361,6 +379,7 @@ class Create(TestCase):
                 "ipv4",
             ),
             [
+                _FIXTURE_REPORT_UDP_DEPRECATED,
                 fixture.error(
                     report_codes.COROSYNC_BAD_NODE_ADDRESSES_COUNT,
                     actual_count=2,
@@ -512,6 +531,7 @@ class Create(TestCase):
                 "ipv4",
             ),
             [
+                _FIXTURE_REPORT_UDP_DEPRECATED,
                 fixture.error(
                     report_codes.COROSYNC_IP_VERSION_MISMATCH_IN_LINKS,
                     link_numbers=["0"],
@@ -538,6 +558,7 @@ class Create(TestCase):
                 "ipv6",
             ),
             [
+                _FIXTURE_REPORT_UDP_DEPRECATED,
                 fixture.error(
                     report_codes.COROSYNC_IP_VERSION_MISMATCH_IN_LINKS,
                     link_numbers=["0"],
@@ -625,6 +646,7 @@ class Create(TestCase):
                 "ipv4",
             ),
             [
+                _FIXTURE_REPORT_UDP_DEPRECATED,
                 fixture.error(
                     report_codes.COROSYNC_BAD_NODE_ADDRESSES_COUNT,
                     actual_count=2,

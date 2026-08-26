@@ -82,6 +82,18 @@ INTERFACE_TEMPLATE = """
 INTERFACE_OPTION_TEMPLATE = """
         {option}: {value}\
 """
+_FIXTURE_REPORT_UDP_DEPRECATED = fixture.deprecation(
+    reports.codes.DEPRECATED_OPTION_VALUE,
+    option_name="transport",
+    deprecated_value="udp",
+    replaced_by="knet",
+)
+_FIXTURE_REPORT_UDPU_DEPRECATED = fixture.deprecation(
+    reports.codes.DEPRECATED_OPTION_VALUE,
+    option_name="transport",
+    deprecated_value="udpu",
+    replaced_by="knet",
+)
 
 
 def flat_list(list_of_lists):
@@ -272,13 +284,15 @@ def reports_success_minimal_fixture(
     node_list=None,
     using_known_hosts_addresses=True,
     keys_sync=True,
+    udp_udpu_deprecation_reports=None,
 ):
     node_list = node_list or NODE_LIST
     auth_file_list = ["corosync authkey", "pacemaker authkey"]
     pcsd_settings_file = "pcsd settings"
     corosync_conf_file = "corosync.conf"
     report_list = (
-        [
+        (udp_udpu_deprecation_reports or [])
+        + [
             fixture.info(
                 reports.codes.USING_DEFAULT_ADDRESS_FOR_HOST,
                 host_name=node,
@@ -1243,10 +1257,11 @@ class Validation(TestCase):
         )
         self.env_assist.assert_reports(
             [
+                _FIXTURE_REPORT_UDPU_DEPRECATED,
                 fixture.error(
                     reports.codes.COROSYNC_IP_VERSION_MISMATCH_IN_LINKS,
                     link_numbers=["0"],
-                )
+                ),
             ]
         )
 
@@ -1281,6 +1296,7 @@ class Validation(TestCase):
         )
         self.env_assist.assert_reports(
             [
+                _FIXTURE_REPORT_UDP_DEPRECATED,
                 fixture.error(
                     reports.codes.COROSYNC_ADDRESS_IP_VERSION_WRONG_FOR_LINK,
                     address="::ffff:10:0:0:3",
@@ -1290,7 +1306,9 @@ class Validation(TestCase):
             ]
         )
 
-    def _assert_corosync_validators_udp_udpu(self, transport):
+    def _assert_corosync_validators_udp_udpu(
+        self, transport, udp_udpu_deprecation_report
+    ):
         # The validators have their own tests. In here, we are only concerned
         # about calling the validators so we test that all provided options
         # have been validated.
@@ -1325,6 +1343,7 @@ class Validation(TestCase):
         )
         self.env_assist.assert_reports(
             [
+                udp_udpu_deprecation_report,
                 fixture.error(
                     reports.codes.INVALID_OPTIONS,
                     option_names=["a"],
@@ -1375,10 +1394,16 @@ class Validation(TestCase):
         )
 
     def test_corosync_validators_udp(self):
-        self._assert_corosync_validators_udp_udpu("udp")
+        self._assert_corosync_validators_udp_udpu(
+            "udp",
+            _FIXTURE_REPORT_UDP_DEPRECATED,
+        )
 
     def test_corosync_validators_udpu(self):
-        self._assert_corosync_validators_udp_udpu("udpu")
+        self._assert_corosync_validators_udp_udpu(
+            "udpu",
+            _FIXTURE_REPORT_UDPU_DEPRECATED,
+        )
 
     def test_corosync_validators_knet(self):
         # The validators have their own tests. In here, we are only concerned
@@ -2268,7 +2293,10 @@ class TransportUdpSuccess(TestCase):
             transport_type=self.transport_type,
         )
         self.env_assist.assert_reports(
-            reports_success_minimal_fixture(using_known_hosts_addresses=False)
+            reports_success_minimal_fixture(
+                using_known_hosts_addresses=False,
+                udp_udpu_deprecation_reports=[_FIXTURE_REPORT_UDP_DEPRECATED],
+            )
         )
 
     def test_all_options(self):
@@ -2312,7 +2340,10 @@ class TransportUdpSuccess(TestCase):
             quorum_options=QUORUM_OPTIONS,
         )
         self.env_assist.assert_reports(
-            reports_success_minimal_fixture(using_known_hosts_addresses=False)
+            reports_success_minimal_fixture(
+                using_known_hosts_addresses=False,
+                udp_udpu_deprecation_reports=[_FIXTURE_REPORT_UDP_DEPRECATED],
+            )
         )
 
 

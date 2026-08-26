@@ -109,6 +109,14 @@ def create(  # noqa: PLR0912, PLR0915
     validators = _get_cluster_name_validators(force_cluster_name) + [
         validate.ValueIn("transport", constants.TRANSPORTS_ALL),
         validate.ValueCorosyncValue("transport"),
+        # deprecated in Corosync 3, to be removed when traffic encryption
+        # becomes mandatory
+        validate.ValueDeprecated(
+            "transport",
+            dict.fromkeys(
+                constants.TRANSPORTS_UDP, constants.TRANSPORT_DEFAULT
+            ),
+        ),
     ]
     report_items = validate.ValidatorAll(validators).validate(
         {"name": cluster_name, "transport": transport}
