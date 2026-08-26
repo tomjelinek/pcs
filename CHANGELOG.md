@@ -15,6 +15,9 @@
   and `pcs cluster node add`
 - Value `sctp` of the knet link option `transport`, following corosync / knet
   (TODO rhel jira link)
+- Setting knet transport crypto options `cipher` or `hash` to `none` or empty
+  string is no longer allowed in `pcs cluster setup` and `pcs cluster config
+  update`. Encryption is always enabled for knet transport.
 
 ### Fixed
 - Command `pcs stonith update-scsi-devices` no longer triggers unnecessary

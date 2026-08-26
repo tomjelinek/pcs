@@ -488,7 +488,7 @@ Compression options are: level, model, threshold
 .br
 Crypto options are: cipher, hash, model
 .br
-By default, encryption is enabled with cipher=aes256 and hash=sha256. To disable encryption, set cipher=none and hash=none.
+By default, encryption is enabled with cipher=aes256 and hash=sha256.
 
 Transports udp and udpu:
 .br
@@ -1737,6 +1737,11 @@ Following Corosync / Kronosnet, pcs has dropped support for:
 SCTP transport in knet links
 .SS "\-\-force no longer accepted as an alternative to \-\-yes or \-\-overwrite"
 The \fB\-\-force\fR flag is no longer accepted as an alternative to interactive confirmation or file overwriting in the following commands. Use \fB\-\-yes\fR or \fB\-\-overwrite\fR instead. Affected commands are: 'pcs cluster destroy', 'pcs quorum unblock', 'pcs stonith confirm', 'pcs stonith sbd device setup', 'pcs stonith sbd watchdog test' (\fB\-\-yes\fR) and 'pcs cluster report' (\fB\-\-overwrite\fR).
+.SS "cluster setup, cluster config update \- knet encryption required"
+Setting knet transport crypto options \fBcipher\fR or \fBhash\fR to \fBnone\fR or clearing
+them with an empty value is no longer allowed. Encryption is always enabled for knet
+transport. The default values \fBcipher=aes256\fR and \fBhash=sha256\fR are set during
+cluster setup when no crypto options are specified.
 .SS "pcsd"
 .TP
 certkey
