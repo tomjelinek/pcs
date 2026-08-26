@@ -1169,63 +1169,6 @@ class FullClusterStatusPlaintext(FullClusterStatusPlaintextBase):
             ),
         )
 
-    def test_corosync_encryption_disabled(self):
-        self._fixture_config_live_minimal()
-        self._fixture_config_local_daemons()
-        self.config.fs.isfile(settings.crm_rule_exec, return_value=True)
-
-        self.config.corosync_conf.load_content(
-            dedent(
-                """\
-                totem {
-                    version: 2
-                    cluster_name: test99
-                    transport: knet
-                    crypto_cipher: none
-                    crypto_hash: none
-                }
-                nodelist {
-                    node {
-                        ring0_addr: rh7-1
-                        nodeid: 1
-                        name: rh7-1
-                    }
-                    node {
-                        ring0_addr: rh7-2
-                        nodeid: 2
-                        name: rh7-2
-                    }
-                }
-                quorum {
-                    provider: corosync_votequorum
-                    two_node: 1
-                }
-                logging {
-                    to_syslog: yes
-                }
-                """
-            ),
-            instead="corosync_conf.load",
-        )
-
-        self.assertEqual(
-            status.full_cluster_status_plaintext(self.env_assist.get_env()),
-            dedent(
-                """\
-                Cluster name: test99
-
-                WARNINGS:
-                Cluster traffic is not encrypted. To enable encryption, use 'knet' transport and set crypto options 'cipher' and 'hash' to value other than 'none'.
-
-                crm_mon cluster status
-
-                Daemon Status:
-                  corosync: active/enabled
-                  pacemaker: active/enabled
-                  pcsd: active/enabled"""
-            ),
-        )
-
 
 class FullClusterStatusPlaintextBoothWarning(FullClusterStatusPlaintextBase):
     def setUp(self):

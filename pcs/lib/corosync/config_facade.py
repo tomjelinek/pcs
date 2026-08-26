@@ -646,16 +646,6 @@ class ConfigFacade(FacadeInterface):
             _KNET_CRYPTO_OPTIONS_PREFIX,
         )
 
-    def is_encryption_enabled(self) -> bool:
-        # Currently, encryption is only available for knet transport.
-        if self.get_transport() not in constants.TRANSPORTS_KNET:
-            return False
-        crypto_options = self.get_crypto_options()
-        return (
-            crypto_options.get("cipher", "none") != "none"
-            and crypto_options.get("hash", "none") != "none"
-        )
-
     def set_totem_options(self, options: Mapping[str, str]) -> None:
         """
         Set options in the "totem" section
