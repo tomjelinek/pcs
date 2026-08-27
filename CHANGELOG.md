@@ -17,7 +17,8 @@
   (TODO rhel jira link)
 - Setting knet transport crypto options `cipher` or `hash` to `none` or empty
   string is no longer allowed in `pcs cluster setup` and `pcs cluster config
-  update`. Encryption is always enabled for knet transport.
+  update`. Pcs no longer allows to disable cluster traffic encryption.
+  (TODO rhel jira link)
 
 ### Fixed
 - Command `pcs stonith update-scsi-devices` no longer triggers unnecessary
@@ -28,12 +29,7 @@
   library `datetime` module. Ordinal date format (`YYYY-DDD`) is no longer
   accepted in rule date expressions.
 
-### Deprecated
-- Disabling cluster traffic encryption (setting knet transport crypto options
-  `cipher` or `hash` to `none`) ([RHEL-218000])
-
 [RHEL-214140]: https://redhat.atlassian.net/browse/RHEL-214140
-[RHEL-218000]: https://redhat.atlassian.net/browse/RHEL-218000
 
 
 ## [0.12.3] - 2026-07-01

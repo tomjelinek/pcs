@@ -1737,42 +1737,6 @@ class CreateTransportKnet(TransportKnetBase, TestCase):
             ],
         )
 
-    def test_crypto_enabled_cipher_default_hash(self):
-        assert_report_item_list_equal(
-            self.call_function(
-                {},
-                {},
-                {
-                    "cipher": "aes256",
-                },
-            ),
-            [
-                self.fixture_error_prerequisite,
-            ],
-        )
-
-    def test_crypto_disabled_cipher_default_hash(self):
-        assert_report_item_list_equal(
-            self.call_function(
-                {},
-                {},
-                {
-                    "cipher": "none",
-                },
-            ),
-            [
-                fixture.error(
-                    report_codes.INVALID_OPTION_VALUE,
-                    option_value="none",
-                    option_name="cipher",
-                    allowed_values=("aes256", "aes192", "aes128"),
-                    cannot_be_empty=False,
-                    forbidden_characters=None,
-                ),
-                self.fixture_error_prerequisite,
-            ],
-        )
-
 
 class CreateTotem(TotemBase, TestCase):
     def call_function(self, options):

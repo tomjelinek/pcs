@@ -20,7 +20,11 @@ class TransportKnetBase:
     )
 
     def call_function(
-        self, generic_options, compression_options, crypto_options
+        self,
+        generic_options,
+        compression_options,
+        crypto_options,
+        current_crypto_options=None,
     ):
         raise NotImplementedError()
 
@@ -450,6 +454,21 @@ class TransportKnetBase:
                     cannot_be_empty=False,
                     forbidden_characters=None,
                 ),
+                self.fixture_error_prerequisite,
+            ],
+        )
+
+    def test_crypto_enabled_cipher_default_hash(self):
+        assert_report_item_list_equal(
+            self.call_function(
+                {},
+                {},
+                {
+                    "cipher": "aes256",
+                },
+            ),
+            [
+                self.fixture_error_prerequisite,
             ],
         )
 

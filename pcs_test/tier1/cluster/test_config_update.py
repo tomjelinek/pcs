@@ -185,6 +185,8 @@ class UpdateLocal(AssertPcsMixin, TestCase):
                 "non-negative integer\n"
                 "Error: '' is not a valid hash value, use 'md5', 'sha1', "
                 "'sha256', 'sha384', 'sha512'\n"
+                "Error: If crypto option 'cipher' is enabled, crypto option "
+                "'hash' must be enabled as well\n"
                 "Error: Errors have occurred, therefore pcs is unable to "
                 "continue\n"
             ),

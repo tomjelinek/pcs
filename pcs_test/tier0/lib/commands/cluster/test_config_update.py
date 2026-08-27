@@ -312,6 +312,13 @@ class UpdateConfig(TestCase):
                     cannot_be_empty=False,
                     forbidden_characters=None,
                 ),
+                fixture.error(
+                    report_codes.PREREQUISITE_OPTION_MUST_BE_ENABLED_AS_WELL,
+                    option_name="cipher",
+                    prerequisite_name="hash",
+                    option_type="crypto",
+                    prerequisite_type="crypto",
+                ),
             ]
         )
 

@@ -1474,6 +1474,10 @@ def _get_transport_knet_crypto_validators(
         "hash", ("md5", "sha1", "sha256", "sha384", "sha512")
     )
     model_validator = validate.ValueIn("model", ("nss", "openssl"))
+    # cipher and hash are intentionally excluded from allow_empty_values:
+    # clearing them would remove the options from the config, causing corosync
+    # to fall back to its build-time defaults, which are unknown to pcs and may
+    # not enable encryption.
     if allow_empty_values:
         model_validator.empty_string_valid = True
     return (
@@ -1543,11 +1547,13 @@ def create_transport_knet(
         allow_empty_values=False,
     )
 
-    crypto_cipher = crypto_options.get("cipher")
-    crypto_hash = crypto_options.get("hash")
+    disabled = ("", "none")
+    # default values depends on corosync build time options and therefore
+    # unknown, to be on the safe side, we assume the default is none
+    crypto_cipher = crypto_options.get("cipher", "none")
+    crypto_hash = crypto_options.get("hash", "none")
 
-    # do not rely on the default hash during create
-    if crypto_cipher and not crypto_hash:
+    if crypto_cipher not in disabled and crypto_hash in disabled:
         report_items.append(
             ReportItem.error(
                 reports.messages.PrerequisiteOptionMustBeEnabledAsWell(
@@ -1566,6 +1572,7 @@ def update_transport_knet(
     generic_options: Mapping[str, str],
     compression_options: Mapping[str, str],
     crypto_options: Mapping[str, str],
+    current_crypto_options: Mapping[str, str],
 ) -> ReportItemList:
     """
     Validate updating knet transport options
@@ -1573,13 +1580,42 @@ def update_transport_knet(
     generic_options -- generic transport options
     compression_options -- compression options
     crypto_options -- crypto options
+    current_crypto_options -- crypto options currently configured
     """
-    return _validate_transport_knet(
+    report_items = _validate_transport_knet(
         generic_options,
         compression_options,
         crypto_options,
         allow_empty_values=True,
     )
+
+    # there are 2 possibilities how to disable crypto options:
+    #   1. set it to "none"
+    #   2. set it to default by using value of empty string
+    #     * we no longer know what the default is, because it depend on
+    #       corosync build-time options
+    #     * therefore, to be on the safe side, we assume the default is none
+    disabled = ("", "none")
+    current_cipher = current_crypto_options.get("cipher", "none")
+    final_cipher = crypto_options.get("cipher", current_cipher)
+    current_hash = current_crypto_options.get("hash", "none")
+    final_hash = crypto_options.get("hash", current_hash)
+
+    crypto_cipher_enabled = final_cipher not in disabled
+    crypto_hash_disabled = final_hash in disabled
+    if crypto_cipher_enabled and crypto_hash_disabled:
+        report_items.append(
+            ReportItem.error(
+                reports.messages.PrerequisiteOptionMustBeEnabledAsWell(
+                    "cipher",
+                    "hash",
+                    option_type="crypto",
+                    prerequisite_type="crypto",
+                )
+            )
+        )
+
+    return report_items
 
 
 def _get_totem_options_validators(

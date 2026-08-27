@@ -94,15 +94,7 @@
     </capability>
 
 
-    <capability id="cluster.knet.encryption.mandatory" in-pcs="1" in-pcsd="0">
-      <description>
-        Disabling knet transport encryption is not allowed. The crypto options
-        cipher and hash cannot be set to 'none' or cleared to the corosync
-        default via empty string.
 
-        pcs commands: cluster setup, cluster config update
-      </description>
-    </capability>
     <capability id="cluster.config.backup-local" in-pcs="1" in-pcsd="0">
       <description>
         Create a tarball containing cluster configuration files (corosync,
@@ -249,6 +241,15 @@
 
         pcs commands: cluster destroy --all
         daemon urls: cluster_destroy (parameter all=1)
+      </description>
+    </capability>
+    <capability id="cluster.knet.encryption.mandatory" in-pcs="1" in-pcsd="1">
+      <description>
+        Disabling knet transport encryption is not allowed. The crypto options
+        cipher and hash cannot be set to 'none' or cleared to the corosync
+        default via empty string.
+
+        pcs commands: cluster setup, cluster config update
       </description>
     </capability>
     <capability id="cluster.node.get-host-daemons-info" in-pcs="0" in-pcsd="1">

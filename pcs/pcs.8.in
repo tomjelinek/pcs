@@ -1735,13 +1735,12 @@ This section summarizes the most important changes in commands done in pcs\-1.0.
 Following Corosync / Kronosnet, pcs has dropped support for:
 .br
 SCTP transport in knet links
+.TP
+cluster setup, cluster config update \- knet encryption required
+.br
+Setting knet transport crypto options \fBcipher\fR or \fBhash\fR to \fBnone\fR or clearing them with an empty value is no longer allowed. Pcs no longer allows to disable cluster traffic encryption. The default values \fBcipher=aes256\fR and \fBhash=sha256\fR are set during cluster setup when no crypto options are specified.
 .SS "\-\-force no longer accepted as an alternative to \-\-yes or \-\-overwrite"
 The \fB\-\-force\fR flag is no longer accepted as an alternative to interactive confirmation or file overwriting in the following commands. Use \fB\-\-yes\fR or \fB\-\-overwrite\fR instead. Affected commands are: 'pcs cluster destroy', 'pcs quorum unblock', 'pcs stonith confirm', 'pcs stonith sbd device setup', 'pcs stonith sbd watchdog test' (\fB\-\-yes\fR) and 'pcs cluster report' (\fB\-\-overwrite\fR).
-.SS "cluster setup, cluster config update \- knet encryption required"
-Setting knet transport crypto options \fBcipher\fR or \fBhash\fR to \fBnone\fR or clearing
-them with an empty value is no longer allowed. Encryption is always enabled for knet
-transport. The default values \fBcipher=aes256\fR and \fBhash=sha256\fR are set during
-cluster setup when no crypto options are specified.
 .SS "pcsd"
 .TP
 certkey

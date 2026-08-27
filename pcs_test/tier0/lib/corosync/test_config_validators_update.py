@@ -29,9 +29,15 @@ class UpdateTransportKnet(TransportKnetBase, TestCase):
         generic_options,
         compression_options,
         crypto_options,
+        current_crypto_options=None,
     ):
         return config_validators.update_transport_knet(
-            generic_options, compression_options, crypto_options
+            generic_options,
+            compression_options,
+            crypto_options,
+            current_crypto_options=(
+                {} if current_crypto_options is None else current_crypto_options
+            ),
         )
 
     def test_empty_values_allowed(self):
@@ -79,21 +85,14 @@ class UpdateTransportKnet(TransportKnetBase, TestCase):
             ],
         )
 
-    def test_crypto_enabled_cipher_default_hash(self):
+    def test_crypto_config_enabled_set_to_disabled(self):
         assert_report_item_list_equal(
             self.call_function(
                 {},
                 {},
-                {
-                    "cipher": "aes256",
-                },
+                {"cipher": "none", "hash": "none"},
+                {"cipher": "aes256", "hash": "sha256"},
             ),
-            [],
-        )
-
-    def test_crypto_config_enabled_set_to_disabled(self):
-        assert_report_item_list_equal(
-            self.call_function({}, {}, {"cipher": "none", "hash": "none"}),
             [
                 fixture.error(
                     reports.codes.INVALID_OPTION_VALUE,
@@ -122,7 +121,12 @@ class UpdateTransportKnet(TransportKnetBase, TestCase):
 
     def test_crypto_config_enabled_set_to_default(self):
         assert_report_item_list_equal(
-            self.call_function({}, {}, {"cipher": "", "hash": ""}),
+            self.call_function(
+                {},
+                {},
+                {"cipher": "", "hash": ""},
+                {"cipher": "aes256", "hash": "sha256"},
+            ),
             [
                 fixture.error(
                     reports.codes.INVALID_OPTION_VALUE,
@@ -151,7 +155,9 @@ class UpdateTransportKnet(TransportKnetBase, TestCase):
 
     def test_crypto_config_enabled_default_hash(self):
         assert_report_item_list_equal(
-            self.call_function({}, {}, {"hash": ""}),
+            self.call_function(
+                {}, {}, {"hash": ""}, {"cipher": "aes256", "hash": "sha256"}
+            ),
             [
                 fixture.error(
                     reports.codes.INVALID_OPTION_VALUE,
@@ -167,53 +173,14 @@ class UpdateTransportKnet(TransportKnetBase, TestCase):
                     cannot_be_empty=False,
                     forbidden_characters=None,
                 ),
+                self.fixture_error_prerequisite,
             ],
         )
 
     def test_crypto_config_enabled_disabled_hash(self):
         assert_report_item_list_equal(
-            self.call_function({}, {}, {"hash": "none"}),
-            [
-                fixture.error(
-                    reports.codes.INVALID_OPTION_VALUE,
-                    option_value="none",
-                    option_name="hash",
-                    allowed_values=(
-                        "md5",
-                        "sha1",
-                        "sha256",
-                        "sha384",
-                        "sha512",
-                    ),
-                    cannot_be_empty=False,
-                    forbidden_characters=None,
-                ),
-            ],
-        )
-
-    def test_crypto_config_enabled_changed_hash(self):
-        assert_report_item_list_equal(
-            self.call_function({}, {}, {"hash": "md5"}),
-            [],
-        )
-
-    def test_crypto_config_enabled_changed_cipher(self):
-        assert_report_item_list_equal(
-            self.call_function({}, {}, {"cipher": "aes128"}),
-            [],
-        )
-
-    def test_crypto_config_hash_enabled_enable_cipher(self):
-        assert_report_item_list_equal(
-            self.call_function({}, {}, {"cipher": "aes128"}), []
-        )
-
-    def test_crypto_config_hash_enabled_enable_cipher_disable_hash(self):
-        assert_report_item_list_equal(
             self.call_function(
-                {},
-                {},
-                {"cipher": "aes128", "hash": "none"},
+                {}, {}, {"hash": "none"}, {"cipher": "aes256", "hash": "sha256"}
             ),
             [
                 fixture.error(
@@ -230,6 +197,64 @@ class UpdateTransportKnet(TransportKnetBase, TestCase):
                     cannot_be_empty=False,
                     forbidden_characters=None,
                 ),
+                self.fixture_error_prerequisite,
+            ],
+        )
+
+    def test_crypto_config_enabled_changed_hash(self):
+        assert_report_item_list_equal(
+            self.call_function(
+                {}, {}, {"hash": "md5"}, {"cipher": "aes256", "hash": "sha256"}
+            ),
+            [],
+        )
+
+    def test_crypto_config_enabled_changed_cipher(self):
+        assert_report_item_list_equal(
+            self.call_function(
+                {},
+                {},
+                {"cipher": "aes128"},
+                {"cipher": "aes256", "hash": "sha256"},
+            ),
+            [],
+        )
+
+    def test_crypto_config_hash_enabled_enable_cipher(self):
+        assert_report_item_list_equal(
+            self.call_function(
+                {},
+                {},
+                {"cipher": "aes128"},
+                {"hash": "sha256"},
+            ),
+            [],
+        )
+
+    def test_crypto_config_hash_enabled_enable_cipher_disable_hash(self):
+        assert_report_item_list_equal(
+            self.call_function(
+                {},
+                {},
+                {"cipher": "aes128", "hash": "none"},
+                {"hash": "sha256"},
+            ),
+            [
+                fixture.error(
+                    reports.codes.INVALID_OPTION_VALUE,
+                    option_value="none",
+                    option_name="hash",
+                    allowed_values=(
+                        "md5",
+                        "sha1",
+                        "sha256",
+                        "sha384",
+                        "sha512",
+                    ),
+                    cannot_be_empty=False,
+                    forbidden_characters=None,
+                ),
+                self.fixture_error_prerequisite,
             ],
         )
 
@@ -239,12 +264,13 @@ class UpdateTransportKnet(TransportKnetBase, TestCase):
                 {},
                 {},
                 {"cipher": "aes128", "hash": ""},
+                {"hash": "sha256"},
             ),
             [
                 fixture.error(
                     reports.codes.INVALID_OPTION_VALUE,
-                    option_value="",
                     option_name="hash",
+                    option_value="",
                     allowed_values=(
                         "md5",
                         "sha1",
@@ -255,6 +281,7 @@ class UpdateTransportKnet(TransportKnetBase, TestCase):
                     cannot_be_empty=False,
                     forbidden_characters=None,
                 ),
+                self.fixture_error_prerequisite,
             ],
         )
 
