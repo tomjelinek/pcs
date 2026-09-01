@@ -2,7 +2,7 @@
 # yamllint disable rule:line-length
 
 # ########################################################################
-# This workflow fast-forward updates the pcs-1.x branch to match main
+# This workflow fast-forward updates the main branch to match pcs-1.x
 # on a daily schedule (or on manual dispatch), using the GitHub API
 # (no checkout required).
 #
@@ -50,11 +50,11 @@ on:
   workflow_dispatch:
     inputs:
       source_branch:
-        description: "Source branch to mirror from (default: main)"
+        description: "Source branch to mirror from (default: pcs-1.x)"
         type: string
         default: ""
       target_branch:
-        description: "Target branch to update (default: pcs-1.x)"
+        description: "Target branch to update (default: main)"
         type: string
         default: ""
 
