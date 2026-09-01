@@ -14,22 +14,18 @@
 - Automatic synchronization of pcsd SSL certificates during `pcs cluster setup`
   and `pcs cluster node add`
 - Value `sctp` of the knet link option `transport`, following corosync / knet
-  (TODO rhel jira link)
 - Setting knet transport crypto options `cipher` or `hash` to `none` or empty
   string is no longer allowed in `pcs cluster setup` and `pcs cluster config
   update`. Pcs no longer allows to disable cluster traffic encryption.
-  (TODO rhel jira link)
 
 ### Fixed
 - Command `pcs stonith update-scsi-devices` no longer triggers unnecessary
-  resource restarts when updating SCSI devices. ([RHEL-214140])
+  resource restarts when updating SCSI devices
 
 ### Changed
 - Dropped dependency on `python-dateutil` in favor of the Python standard
   library `datetime` module. Ordinal date format (`YYYY-DDD`) is no longer
   accepted in rule date expressions.
-
-[RHEL-214140]: https://redhat.atlassian.net/browse/RHEL-214140
 
 
 ## [0.12.3] - 2026-07-01
