@@ -118,10 +118,11 @@ def corosync_conf_fixture(  # noqa: PLR0913
     if cluster_uuid:
         cluster_uuid = f"\n    cluster_uuid: {cluster_uuid}"
 
-    if transport_type == "knet" and not crypto_options:
+    if transport_type == "knet":
         crypto_options = {
             "cipher": "aes256",
             "hash": "sha256",
+            **(crypto_options or {}),
         }
     interface_list = ""
     if link_list:
@@ -1285,9 +1286,6 @@ class Validation(TestCase):
                     allowed=["cipher", "hash", "model"],
                     allowed_patterns=[],
                 ),
-                fixture.deprecation(
-                    reports.codes.COROSYNC_CONFIG_DISABLING_ENCRYPTION_DEPRECATED
-                ),
                 fixture.error(
                     reports.codes.INVALID_OPTIONS,
                     option_names=["b"],
@@ -1849,6 +1847,40 @@ class TransportKnetSuccess(TestCase):
             reports_success_minimal_fixture(using_known_hosts_addresses=False)
         )
 
+    def _test_crypto_partial_options(self, crypto_options):
+        node_addrs = {
+            node: [f"{node}.addr{i}" for i in range(constants.LINKS_KNET_MAX)]
+            for node in NODE_LIST
+        }
+        self.resolvable_hosts.extend(set(flat_list(node_addrs.values())))
+        config_success_minimal_fixture(
+            self.config,
+            corosync_conf=corosync_conf_fixture(
+                node_addrs,
+                transport_type=self.transport_type,
+                crypto_options=crypto_options,
+            ),
+        )
+        cluster.setup(
+            self.env_assist.get_env(),
+            CLUSTER_NAME,
+            [
+                dict(name=node, addrs=addrs)
+                for node, addrs in node_addrs.items()
+            ],
+            transport_type=self.transport_type,
+            crypto_options=crypto_options,
+        )
+        self.env_assist.assert_reports(
+            reports_success_minimal_fixture(using_known_hosts_addresses=False)
+        )
+
+    def test_crypto_cipher_only(self):
+        self._test_crypto_partial_options({"cipher": "aes128"})
+
+    def test_crypto_hash_only(self):
+        self._test_crypto_partial_options({"hash": "sha512"})
+
     def test_all_options(self):
         node_addrs = {
             node: [f"{node}.addr{i}" for i in range(constants.LINKS_KNET_MAX)]
@@ -1932,41 +1964,58 @@ class TransportKnetSuccess(TestCase):
     def test_disable_crypto(self):
         node_addrs = {node: [f"{node}.addr"] for node in NODE_LIST}
         self.resolvable_hosts.extend(set(flat_list(node_addrs.values())))
-        crypto_options = dict(
-            cipher="none",
-            hash="none",
+        get_host_info_ok = {
+            "services": {
+                service: {
+                    "installed": True,
+                    "enabled": False,
+                    "running": False,
+                    "version": "1.0",
+                }
+                for service in SERVICE_LIST
+            },
+            "cluster_configuration_exists": False,
+        }
+        self.config.http.host.get_host_info(
+            NODE_LIST, output_data=get_host_info_ok
         )
-        config_success_minimal_fixture(
-            self.config,
-            corosync_conf=corosync_conf_fixture(
-                node_addrs,
+        self.env_assist.assert_raise_library_error(
+            lambda: cluster.setup(
+                self.env_assist.get_env(),
+                CLUSTER_NAME,
+                [
+                    dict(name=node, addrs=addrs)
+                    for node, addrs in node_addrs.items()
+                ],
                 transport_type=self.transport_type,
-                crypto_options=crypto_options,
-            ),
-        )
-
-        cluster.setup(
-            self.env_assist.get_env(),
-            CLUSTER_NAME,
-            [
-                dict(
-                    name=node,
-                    addrs=addrs,
-                )
-                for node, addrs in node_addrs.items()
-            ],
-            transport_type=self.transport_type,
-            crypto_options=crypto_options,
+                crypto_options=dict(cipher="none", hash="none"),
+            )
         )
         self.env_assist.assert_reports(
             [
-                fixture.deprecation(
-                    reports.codes.COROSYNC_CONFIG_DISABLING_ENCRYPTION_DEPRECATED
+                fixture.error(
+                    reports.codes.INVALID_OPTION_VALUE,
+                    option_value="none",
+                    option_name="cipher",
+                    allowed_values=("aes256", "aes192", "aes128"),
+                    cannot_be_empty=False,
+                    forbidden_characters=None,
+                ),
+                fixture.error(
+                    reports.codes.INVALID_OPTION_VALUE,
+                    option_value="none",
+                    option_name="hash",
+                    allowed_values=(
+                        "md5",
+                        "sha1",
+                        "sha256",
+                        "sha384",
+                        "sha512",
+                    ),
+                    cannot_be_empty=False,
+                    forbidden_characters=None,
                 ),
             ]
-            + reports_success_minimal_fixture(
-                using_known_hosts_addresses=False
-            ),
         )
 
 
@@ -3039,6 +3088,47 @@ class SetupLocal(TestCase):
                 for node in NODE_LIST
             ]
         )
+
+    def _test_crypto_partial_options(self, crypto_options):
+        self.config.env.set_known_nodes(NODE_LIST + ["random_node"])
+        patch_getaddrinfo(self, NODE_LIST)
+        self.assertEqual(
+            corosync_conf_fixture(
+                COROSYNC_NODE_LIST, crypto_options=crypto_options
+            ),
+            cluster.setup_local(
+                self.env_assist.get_env(),
+                CLUSTER_NAME,
+                COMMAND_NODE_LIST,
+                transport_type=None,
+                transport_options={},
+                link_list=[],
+                compression_options={},
+                crypto_options=crypto_options,
+                totem_options={},
+                quorum_options={},
+                force_flags=[],
+            ).decode("utf-8"),
+        )
+        self.env_assist.assert_reports(
+            [
+                fixture.info(
+                    reports.codes.USING_DEFAULT_ADDRESS_FOR_HOST,
+                    host_name=node,
+                    address=node,
+                    address_source=(
+                        reports.const.DEFAULT_ADDRESS_SOURCE_KNOWN_HOSTS
+                    ),
+                )
+                for node in NODE_LIST
+            ]
+        )
+
+    def test_crypto_cipher_only(self):
+        self._test_crypto_partial_options({"cipher": "aes128"})
+
+    def test_crypto_hash_only(self):
+        self._test_crypto_partial_options({"hash": "sha512"})
 
     def test_address_defaulting(self):
         self.config.env.set_known_nodes(NODE_LIST[2:] + ["random_node"])

@@ -169,12 +169,6 @@ def full_cluster_status_plaintext(  # noqa: PLR0912, PLR0915
 
     # check and warn about various issues
     warning_list = list(warning_list)
-    if corosync_conf and not corosync_conf.is_encryption_enabled():
-        warning_list.append(
-            "Cluster traffic is not encrypted. To enable encryption, use "
-            "'knet' transport and set crypto options 'cipher' and 'hash' "
-            "to value other than 'none'."
-        )
     warning_list.extend(_stonith_warnings(cib))
     warning_list.extend(
         _move_constraints_warnings(cib, runner, report_processor)

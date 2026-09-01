@@ -40,65 +40,6 @@ class UpdateTransportKnet(TransportKnetBase, TestCase):
             ),
         )
 
-    def test_no_options(self):
-        # This test was originally in TransportKnetBase class as it was the
-        # same for both create and update. Then the create and update cases
-        # changed and started to behave differently with respect to
-        # report_codes.COROSYNC_CONFIG_DISABLING_ENCRYPTION_DEPRECATED. Once
-        # that is removed and the cases no longer differ, the test should be
-        # moved back to the parent class.
-        assert_report_item_list_equal(
-            self.call_function({}, {}, {}),
-            [],
-        )
-
-    def test_invalid_options(self):
-        # This test was originally in TransportKnetBase class as it was the
-        # same for both create and update. Then the create and update cases
-        # changed and started to behave differently with respect to
-        # report_codes.COROSYNC_CONFIG_DISABLING_ENCRYPTION_DEPRECATED. Once
-        # that is removed and the cases no longer differ, the test should be
-        # moved back to the parent class.
-        assert_report_item_list_equal(
-            self.call_function(
-                {
-                    "level": "5",
-                    "netmtu": "1500",
-                },
-                {
-                    "cipher": "aes256",
-                    "hash": "sha256",
-                },
-                {
-                    "ip_version": "ipv4",
-                    "link_mode": "active",
-                },
-            ),
-            [
-                fixture.error(
-                    reports.codes.INVALID_OPTIONS,
-                    option_names=["level", "netmtu"],
-                    option_type="knet transport",
-                    allowed=["ip_version", "knet_pmtud_interval", "link_mode"],
-                    allowed_patterns=[],
-                ),
-                fixture.error(
-                    reports.codes.INVALID_OPTIONS,
-                    option_names=["cipher", "hash"],
-                    option_type="compression",
-                    allowed=["level", "model", "threshold"],
-                    allowed_patterns=[],
-                ),
-                fixture.error(
-                    reports.codes.INVALID_OPTIONS,
-                    option_names=["ip_version", "link_mode"],
-                    option_type="crypto",
-                    allowed=["cipher", "hash", "model"],
-                    allowed_patterns=[],
-                ),
-            ],
-        )
-
     def test_empty_values_allowed(self):
         assert_report_item_list_equal(
             self.call_function(
@@ -119,48 +60,29 @@ class UpdateTransportKnet(TransportKnetBase, TestCase):
                 },
             ),
             [
-                fixture.deprecation(
-                    reports.codes.COROSYNC_CONFIG_DISABLING_ENCRYPTION_DEPRECATED
+                fixture.error(
+                    reports.codes.INVALID_OPTION_VALUE,
+                    option_value="",
+                    option_name="cipher",
+                    allowed_values=("aes256", "aes192", "aes128"),
+                    cannot_be_empty=False,
+                    forbidden_characters=None,
+                ),
+                fixture.error(
+                    reports.codes.INVALID_OPTION_VALUE,
+                    option_value="",
+                    option_name="hash",
+                    allowed_values=(
+                        "md5",
+                        "sha1",
+                        "sha256",
+                        "sha384",
+                        "sha512",
+                    ),
+                    cannot_be_empty=False,
+                    forbidden_characters=None,
                 ),
             ],
-        )
-
-    def test_crypto_enabled_cipher_default_hash(self):
-        # This test was originally in TransportKnetBase class as it was the
-        # same for both create and update. Then the create and update cases
-        # changed and started to behave differently with respect to
-        # report_codes.COROSYNC_CONFIG_DISABLING_ENCRYPTION_DEPRECATED. Once
-        # that is removed and the cases no longer differ, the test should be
-        # moved back to the parent class.
-        assert_report_item_list_equal(
-            self.call_function(
-                {},
-                {},
-                {
-                    "cipher": "aes256",
-                },
-            ),
-            [
-                self.fixture_error_prerequisite,
-            ],
-        )
-
-    def test_crypto_enabled_hash_default_cipher(self):
-        # This test was originally in TransportKnetBase class as it was the
-        # same for both create and update. Then the create and update cases
-        # changed and started to behave differently with respect to
-        # report_codes.COROSYNC_CONFIG_DISABLING_ENCRYPTION_DEPRECATED. Once
-        # that is removed and the cases no longer differ, the test should be
-        # moved back to the parent class.
-        assert_report_item_list_equal(
-            self.call_function(
-                {},
-                {},
-                {
-                    "hash": "sha256",
-                },
-            ),
-            [],
         )
 
     def test_crypto_config_enabled_set_to_disabled(self):
@@ -172,8 +94,27 @@ class UpdateTransportKnet(TransportKnetBase, TestCase):
                 {"cipher": "aes256", "hash": "sha256"},
             ),
             [
-                fixture.deprecation(
-                    reports.codes.COROSYNC_CONFIG_DISABLING_ENCRYPTION_DEPRECATED
+                fixture.error(
+                    reports.codes.INVALID_OPTION_VALUE,
+                    option_value="none",
+                    option_name="cipher",
+                    allowed_values=("aes256", "aes192", "aes128"),
+                    cannot_be_empty=False,
+                    forbidden_characters=None,
+                ),
+                fixture.error(
+                    reports.codes.INVALID_OPTION_VALUE,
+                    option_value="none",
+                    option_name="hash",
+                    allowed_values=(
+                        "md5",
+                        "sha1",
+                        "sha256",
+                        "sha384",
+                        "sha512",
+                    ),
+                    cannot_be_empty=False,
+                    forbidden_characters=None,
                 ),
             ],
         )
@@ -187,8 +128,27 @@ class UpdateTransportKnet(TransportKnetBase, TestCase):
                 {"cipher": "aes256", "hash": "sha256"},
             ),
             [
-                fixture.deprecation(
-                    reports.codes.COROSYNC_CONFIG_DISABLING_ENCRYPTION_DEPRECATED
+                fixture.error(
+                    reports.codes.INVALID_OPTION_VALUE,
+                    option_value="",
+                    option_name="cipher",
+                    allowed_values=("aes256", "aes192", "aes128"),
+                    cannot_be_empty=False,
+                    forbidden_characters=None,
+                ),
+                fixture.error(
+                    reports.codes.INVALID_OPTION_VALUE,
+                    option_value="",
+                    option_name="hash",
+                    allowed_values=(
+                        "md5",
+                        "sha1",
+                        "sha256",
+                        "sha384",
+                        "sha512",
+                    ),
+                    cannot_be_empty=False,
+                    forbidden_characters=None,
                 ),
             ],
         )
@@ -199,8 +159,19 @@ class UpdateTransportKnet(TransportKnetBase, TestCase):
                 {}, {}, {"hash": ""}, {"cipher": "aes256", "hash": "sha256"}
             ),
             [
-                fixture.deprecation(
-                    reports.codes.COROSYNC_CONFIG_DISABLING_ENCRYPTION_DEPRECATED
+                fixture.error(
+                    reports.codes.INVALID_OPTION_VALUE,
+                    option_value="",
+                    option_name="hash",
+                    allowed_values=(
+                        "md5",
+                        "sha1",
+                        "sha256",
+                        "sha384",
+                        "sha512",
+                    ),
+                    cannot_be_empty=False,
+                    forbidden_characters=None,
                 ),
                 self.fixture_error_prerequisite,
             ],
@@ -212,8 +183,19 @@ class UpdateTransportKnet(TransportKnetBase, TestCase):
                 {}, {}, {"hash": "none"}, {"cipher": "aes256", "hash": "sha256"}
             ),
             [
-                fixture.deprecation(
-                    reports.codes.COROSYNC_CONFIG_DISABLING_ENCRYPTION_DEPRECATED
+                fixture.error(
+                    reports.codes.INVALID_OPTION_VALUE,
+                    option_value="none",
+                    option_name="hash",
+                    allowed_values=(
+                        "md5",
+                        "sha1",
+                        "sha256",
+                        "sha384",
+                        "sha512",
+                    ),
+                    cannot_be_empty=False,
+                    forbidden_characters=None,
                 ),
                 self.fixture_error_prerequisite,
             ],
@@ -258,8 +240,19 @@ class UpdateTransportKnet(TransportKnetBase, TestCase):
                 {"hash": "sha256"},
             ),
             [
-                fixture.deprecation(
-                    reports.codes.COROSYNC_CONFIG_DISABLING_ENCRYPTION_DEPRECATED
+                fixture.error(
+                    reports.codes.INVALID_OPTION_VALUE,
+                    option_value="none",
+                    option_name="hash",
+                    allowed_values=(
+                        "md5",
+                        "sha1",
+                        "sha256",
+                        "sha384",
+                        "sha512",
+                    ),
+                    cannot_be_empty=False,
+                    forbidden_characters=None,
                 ),
                 self.fixture_error_prerequisite,
             ],
@@ -274,8 +267,19 @@ class UpdateTransportKnet(TransportKnetBase, TestCase):
                 {"hash": "sha256"},
             ),
             [
-                fixture.deprecation(
-                    reports.codes.COROSYNC_CONFIG_DISABLING_ENCRYPTION_DEPRECATED
+                fixture.error(
+                    reports.codes.INVALID_OPTION_VALUE,
+                    option_name="hash",
+                    option_value="",
+                    allowed_values=(
+                        "md5",
+                        "sha1",
+                        "sha256",
+                        "sha384",
+                        "sha512",
+                    ),
+                    cannot_be_empty=False,
+                    forbidden_characters=None,
                 ),
                 self.fixture_error_prerequisite,
             ],

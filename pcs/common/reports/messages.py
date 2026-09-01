@@ -6133,22 +6133,6 @@ class CorosyncQuorumLossUnableToCheck(ReportItemMessage):
 
 
 @dataclass(frozen=True)
-class CorosyncConfigDisablingEncryptionDeprecated(ReportItemMessage):
-    """
-    Upcoming corosync major version won't provide means to disable encryption
-    """
-
-    _code = codes.COROSYNC_CONFIG_DISABLING_ENCRYPTION_DEPRECATED
-
-    @property
-    def message(self) -> str:
-        return (
-            "Disabling cluster traffic encryption is deprecated and will not "
-            "be possible in a future version"
-        )
-
-
-@dataclass(frozen=True)
 class SbdListWatchdogError(ReportItemMessage):
     """
     Unable to get list of available watchdogs from sbd. Sbd cmd reutrned non 0.

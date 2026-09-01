@@ -170,7 +170,7 @@ class UpdateConfig(TestCase):
             need_stopped_cluster=False,
         )
 
-    def test_remove_all_options(self):
+    def test_remove_all_but_cipher_hash(self):
         self.config.corosync_conf.load_content(
             fixture_totem(
                 transport_options=TRANSPORT_OPTIONS,
@@ -180,20 +180,61 @@ class UpdateConfig(TestCase):
             )
         )
         self.config.env.push_corosync_conf(
-            corosync_conf_text=fixture_totem(),
+            corosync_conf_text=fixture_totem(
+                crypto_options={"cipher": "aes256", "hash": "sha256"}
+            ),
             need_stopped_cluster=True,
         )
         cluster.config_update(
             self.env_assist.get_env(),
             dict.fromkeys(ALLOWED_KNET_TRANSPORT_OPTIONS, ""),
             dict.fromkeys(ALLOWED_COMPRESSION_OPTIONS, ""),
-            dict.fromkeys(ALLOWED_CRYPTO_OPTIONS, ""),
+            {"model": ""},
             dict.fromkeys(ALLOWED_TOTEM_OPTIONS, ""),
+        )
+        self.env_assist.assert_reports([])
+
+    def test_remove_crypto_cipher_hash_options(self):
+        self.config.corosync_conf.load_content(
+            fixture_totem(
+                transport_options=TRANSPORT_OPTIONS,
+                compression_options=COMPRESSION_OPTIONS,
+                crypto_options=CRYPTO_OPTIONS,
+                totem_options=TOTEM_OPTIONS,
+            )
+        )
+        self.env_assist.assert_raise_library_error(
+            lambda: cluster.config_update(
+                self.env_assist.get_env(),
+                transport_options={},
+                compression_options={},
+                crypto_options=dict.fromkeys(ALLOWED_CRYPTO_OPTIONS, ""),
+                totem_options={},
+            )
         )
         self.env_assist.assert_reports(
             [
-                fixture.deprecation(
-                    report_codes.COROSYNC_CONFIG_DISABLING_ENCRYPTION_DEPRECATED
+                fixture.error(
+                    report_codes.INVALID_OPTION_VALUE,
+                    option_name="cipher",
+                    option_value="",
+                    allowed_values=("aes256", "aes192", "aes128"),
+                    cannot_be_empty=False,
+                    forbidden_characters=None,
+                ),
+                fixture.error(
+                    report_codes.INVALID_OPTION_VALUE,
+                    option_name="hash",
+                    option_value="",
+                    allowed_values=(
+                        "md5",
+                        "sha1",
+                        "sha256",
+                        "sha384",
+                        "sha512",
+                    ),
+                    cannot_be_empty=False,
+                    forbidden_characters=None,
                 ),
             ]
         )
@@ -267,7 +308,7 @@ class UpdateConfig(TestCase):
                     report_codes.INVALID_OPTION_VALUE,
                     option_name="cipher",
                     option_value="strong",
-                    allowed_values=("none", "aes256", "aes192", "aes128"),
+                    allowed_values=("aes256", "aes192", "aes128"),
                     cannot_be_empty=False,
                     forbidden_characters=None,
                 ),

@@ -1467,16 +1467,19 @@ def _get_transport_knet_crypto_validators(
     options: Mapping[str, str],
     allow_empty_values: bool,
 ) -> list[validate.ValidatorInterface]:
-    validators = [
-        validate.ValueIn("cipher", ("none", "aes256", "aes192", "aes128")),
-        validate.ValueIn(
-            "hash", ("none", "md5", "sha1", "sha256", "sha384", "sha512")
-        ),
-        validate.ValueIn("model", ("nss", "openssl")),
-    ]
+    cipher_validator = validate.ValueIn(
+        "cipher", ("aes256", "aes192", "aes128")
+    )
+    hash_validator = validate.ValueIn(
+        "hash", ("md5", "sha1", "sha256", "sha384", "sha512")
+    )
+    model_validator = validate.ValueIn("model", ("nss", "openssl"))
+    # cipher and hash are intentionally excluded from allow_empty_values:
+    # clearing them would remove the options from the config, causing corosync
+    # to fall back to its build-time defaults, which are unknown to pcs and may
+    # not enable encryption.
     if allow_empty_values:
-        for val in validators:
-            val.empty_string_valid = True
+        model_validator.empty_string_valid = True
     return (
         [
             validate.NamesIn(
@@ -1486,7 +1489,7 @@ def _get_transport_knet_crypto_validators(
         + _get_unsuitable_keys_and_values_validators(
             options, option_type="crypto"
         )
-        + list(validators)
+        + [cipher_validator, hash_validator, model_validator]
     )
 
 
@@ -1544,11 +1547,13 @@ def create_transport_knet(
         allow_empty_values=False,
     )
 
-    # default values taken from `man corosync.conf`
+    disabled = ("", "none")
+    # default values depends on corosync build time options and therefore
+    # unknown, to be on the safe side, we assume the default is none
     crypto_cipher = crypto_options.get("cipher", "none")
     crypto_hash = crypto_options.get("hash", "none")
 
-    if crypto_cipher != "none" and crypto_hash == "none":
+    if crypto_cipher not in disabled and crypto_hash in disabled:
         report_items.append(
             ReportItem.error(
                 reports.messages.PrerequisiteOptionMustBeEnabledAsWell(
@@ -1557,16 +1562,6 @@ def create_transport_knet(
                     option_type="crypto",
                     prerequisite_type="crypto",
                 )
-            )
-        )
-
-    # If crypto or hash isn't specified, corosync will use default values,
-    # which equal to 'none'. This means traffic encryption is disabled,
-    # therefore we emit a message pointing that out.
-    if crypto_cipher in ("", "none") or crypto_hash in ("", "none"):
-        report_items.append(
-            reports.ReportItem.deprecation(
-                reports.messages.CorosyncConfigDisablingEncryptionDeprecated()
             )
         )
 
@@ -1596,8 +1591,10 @@ def update_transport_knet(
 
     # there are 2 possibilities how to disable crypto options:
     #   1. set it to "none"
-    #   2. set it to default, which is "none" according to `man corosync.conf`,
-    #      by using value of empty string
+    #   2. set it to default by using value of empty string
+    #     * we no longer know what the default is, because it depend on
+    #       corosync build-time options
+    #     * therefore, to be on the safe side, we assume the default is none
     disabled = ("", "none")
     current_cipher = current_crypto_options.get("cipher", "none")
     final_cipher = crypto_options.get("cipher", current_cipher)
@@ -1615,22 +1612,6 @@ def update_transport_knet(
                     option_type="crypto",
                     prerequisite_type="crypto",
                 )
-            )
-        )
-
-    # When encryption settings are being set in such a way that the encryption
-    # will be disabled, emit a message. It doesn't matter whether the encryption
-    # was disabled already: 1) the user may not know that, it might have been
-    # set like that long time ago 2) it would be inconsistent and therefore
-    # confusing not to emit the message in such case.
-    # When encryption options are not being changed, do not warn even if the
-    # encryption is disabled. It would be confusing to the user otherwise.
-    if (
-        "cipher" in crypto_options and crypto_options["cipher"] in disabled
-    ) or ("hash" in crypto_options and crypto_options["hash"] in disabled):
-        report_items.append(
-            reports.ReportItem.deprecation(
-                reports.messages.CorosyncConfigDisablingEncryptionDeprecated()
             )
         )
 

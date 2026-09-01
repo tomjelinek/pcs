@@ -4507,17 +4507,6 @@ class CorosyncQuorumLossUnableToCheck(NameBuildTest):
         )
 
 
-class CorosyncConfigDisablingEncryptionDeprecated(NameBuildTest):
-    def test_success(self):
-        self.assert_message_from_report(
-            (
-                "Disabling cluster traffic encryption is deprecated and will "
-                "not be possible in a future version"
-            ),
-            reports.CorosyncConfigDisablingEncryptionDeprecated(),
-        )
-
-
 class SbdListWatchdogError(NameBuildTest):
     def test_success(self):
         self.assert_message_from_report(

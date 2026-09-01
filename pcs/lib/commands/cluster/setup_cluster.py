@@ -29,6 +29,11 @@ from pcs.lib.env import LibraryEnvironment, WaitType
 from pcs.lib.errors import LibraryError
 from pcs.lib.tools import generate_binary_key, generate_uuid
 
+_PCS_DEFAULT_KNET_CRYPTO_OPTIONS: Mapping[str, str] = {
+    "cipher": "aes256",
+    "hash": "sha256",
+}
+
 
 def setup(  # noqa:  PLR0913, PLR0915
     env: LibraryEnvironment,
@@ -104,14 +109,8 @@ def setup(  # noqa:  PLR0913, PLR0915
     totem_options = totem_options or {}
     quorum_options = quorum_options or {}
     nodes = [normalize_dict(node, {"addrs"}) for node in nodes]
-    if (
-        transport_type in corosync_constants.TRANSPORTS_KNET
-        and not crypto_options
-    ):
-        crypto_options = {
-            "cipher": "aes256",
-            "hash": "sha256",
-        }
+    if transport_type in corosync_constants.TRANSPORTS_KNET:
+        crypto_options = {**_PCS_DEFAULT_KNET_CRYPTO_OPTIONS, **crypto_options}
 
     report_processor = env.report_processor
     target_factory = env.get_node_target_factory()
@@ -312,14 +311,8 @@ def setup_local(  # noqa: PLR0913
 
     transport_type = transport_type or "knet"
     nodes = [normalize_dict(node, {"addrs"}) for node in nodes]
-    if (
-        transport_type in corosync_constants.TRANSPORTS_KNET
-        and not crypto_options
-    ):
-        crypto_options = {
-            "cipher": "aes256",
-            "hash": "sha256",
-        }
+    if transport_type in corosync_constants.TRANSPORTS_KNET:
+        crypto_options = {**_PCS_DEFAULT_KNET_CRYPTO_OPTIONS, **crypto_options}
 
     report_processor = env.report_processor
     target_factory = env.get_node_target_factory()
