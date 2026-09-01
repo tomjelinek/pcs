@@ -62,8 +62,8 @@ permissions:
   contents: read
 
 env:
-  DEFAULT_SOURCE_BRANCH: main
-  DEFAULT_TARGET_BRANCH: pcs-1.x
+  DEFAULT_SOURCE_BRANCH: pcs-1.x
+  DEFAULT_TARGET_BRANCH: main
 
 jobs:
   mirror:
