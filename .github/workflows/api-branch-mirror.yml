@@ -43,9 +43,10 @@
 name: API Branch Mirror
 # yamllint disable-line rule:truthy
 on:
-  # Trigger every day at 3am (UTC).
+  # Trigger every day at 3am UTC
   schedule:
     - cron: "0 3 * * *"
+      timezone: UTC
   workflow_dispatch:
     inputs:
       source_branch:
